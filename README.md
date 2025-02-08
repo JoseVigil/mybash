@@ -1,8 +1,9 @@
-# mybash �
+# ![cl](assets/cl.png)   mybash 
 
-![mybash banner](assets/matrix.png)
+![matrix](assets/matrix.png)
 
-Welcome to **mybash**! �� I just wanted to be more productive while coding, so **mybash** started as a simple way to bookmark paths and commands using two short and powerful acronyms: `cmd` (for command) and `bkm` (for bookmarks). From there, everything else is history. **Let’s go!** �
+Welcome to **mybash**
+ I just wanted to be more productive while coding, so **mybash** started as a simple way to bookmark paths and commands using two short and powerful acronyms: `cmd` (for command) and `bkm` (for bookmarks). From there, everything else is history. **Let’s go!** �
 
 ---
 
@@ -19,11 +20,11 @@ Welcome to **mybash**! �� I just wanted to be more productive while coding, 
 
 ## ✨ Features
 
-✅ **Intuitive Command Syntax** – Simplified commands for everyday tasks.  
-� **Customizable Aliases** – Create shortcuts for frequently used commands.  
-� **Cross-Platform Support** – Works on Linux, macOS, and Windows (via WSL).  
-⚡ **Lightweight** – Minimal resource usage for smooth performance.  
-�️ **Extensible Plugins** – Add new features with community-driven plugins.  
+✅ **Intuitive Command Syntax** – Simplified commands for everyday tasks.
+� **Customizable Aliases** – Create shortcuts for frequently used commands.
+� **Cross-Platform Support** – Works on Linux, macOS, and Windows (via WSL).
+⚡ **Lightweight** – Minimal resource usage for smooth performance.
+�️ **Extensible Plugins** – Add new features with community-driven plugins.
 
 ---
 
@@ -31,7 +32,7 @@ Welcome to **mybash**! �� I just wanted to be more productive while coding, 
 
 ### � Prerequisites
 
-- A working terminal environment (Bash, Zsh, or WSL on Windows).  
+- A working terminal environment (Bash, Zsh, or WSL on Windows).
 - Ensure Git is installed:
   ```bash
   sudo apt install git  # For Debian/Ubuntu
@@ -41,16 +42,19 @@ Welcome to **mybash**! �� I just wanted to be more productive while coding, 
 ### � Steps
 
 Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/mybash.git
 ```
 
 Navigate to the project directory:
+
 ```bash
 cd mybash
 ```
 
 Run the installation script:
+
 ```bash
 ./install.sh
 ```
@@ -64,11 +68,13 @@ Restart your terminal to start using **mybash**. �
 ### � Basic Commands
 
 Start mybash:
+
 ```bash
 mybash
 ```
 
 List available commands:
+
 ```bash
 mybash --help
 ```
@@ -76,11 +82,13 @@ mybash --help
 ### ⚡ Example Workflow
 
 Create a new alias:
+
 ```bash
 mybash alias add ll "ls -la"
 ```
 
 Use the alias:
+
 ```bash
 ll
 ```
@@ -120,9 +128,9 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 
 Have questions or feedback? Let’s connect! ✉️�
 
-� **Email**: josemanuelvigil@gmail.com  
-� **GitHub**: [@yourusername](https://github.com/josevigil)  
-� **Twitter**: [@yourhandle](https://twitter.com/josevigil)  
+� **Email**: josemanuelvigil@gmail.com
+� **GitHub**: [@yourusername](https://github.com/josevigil)
+� **Twitter**: [@yourhandle](https://twitter.com/josevigil)
 
 ---
 

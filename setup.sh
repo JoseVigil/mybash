@@ -39,7 +39,7 @@ install_dependencies() {
 
 # Create symbolic links in /usr/local/bin
 echo "Creating symbolic links in /usr/local/bin..."
-ln -sf "$MYBASH_DIR/bookmark" /usr/local/bin/bookmark
+ln -sf "$MYBASH_DIR/bkm" /usr/local/bin/bkm
 ln -sf "$MYBASH_DIR/cmd" /usr/local/bin/cmd
 ln -sf "$MYBASH_DIR/mybash" /usr/local/bin/mybash
 
