@@ -1,0 +1,91 @@
+#!/bin/zsh
+
+# Define the mybash directory and export directory
+MYBASH_DIR=~/mybash
+EXPORT_DIR=~/Documents/mybash/export
+
+# Ensure the export directory exists
+mkdir -p "$EXPORT_DIR"
+
+# Source the main mybash.zsh file
+source "$MYBASH_DIR/mybash.zsh" "$@"
+
+# Handle parameters
+case "$1" in
+    --help)
+        # Display help message
+        mybash_help
+        ;;
+    export)
+        # Export bookmarks and commands to JSON
+        echo "Exporting data to $EXPORT_DIR..."
+
+        # Create a timestamped folder
+        TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+        EXPORT_TIMESTAMP_DIR="$EXPORT_DIR/$TIMESTAMP"
+        mkdir -p "$EXPORT_TIMESTAMP_DIR"
+
+        # Export bookmarks
+        if [[ -f ~/.bookmarks ]]; then
+            jq -R -s -c '
+                split("\n") |
+                map(split("=") | {key: .[0], value: .[1]}) |
+                .[:-1]
+            ' ~/.bookmarks > "$EXPORT_TIMESTAMP_DIR/bookmarks.json"
+        else
+            echo "{}" > "$EXPORT_TIMESTAMP_DIR/bookmarks.json"
+        fi
+
+        # Export command bookmarks
+        if [[ -f ~/.cmd_bookmarks ]]; then
+            jq -R -s -c '
+                split("\n") |
+                map(split("=") | {key: .[0], value: .[1]}) |
+                .[:-1]
+            ' ~/.cmd_bookmarks > "$EXPORT_TIMESTAMP_DIR/commands.json"
+        else
+            echo "{}" > "$EXPORT_TIMESTAMP_DIR/commands.json"
+        fi
+
+        echo "Data exported successfully to $EXPORT_TIMESTAMP_DIR."
+        ;;
+    import)
+        # Import bookmarks and commands from JSON
+        echo "Available export folders:"
+        FOLDERS=("$EXPORT_DIR"/*)
+        if [[ ${#FOLDERS[@]} -eq 0 ]]; then
+            echo "No export folders found in $EXPORT_DIR."
+            return 1
+        fi
+
+        # List folders with numbers
+        for i in "${!FOLDERS[@]}"; do
+            echo "$((i+1))) ${FOLDERS[$i]}"
+        done
+
+        # Prompt user to select a folder
+        read -p "Enter the number of the folder to import: " CHOICE
+        if [[ -z "$CHOICE" || "$CHOICE" -lt 1 || "$CHOICE" -gt ${#FOLDERS[@]} ]]; then
+            echo "Invalid choice."
+            return 1
+        fi
+
+        SELECTED_FOLDER="${FOLDERS[$((CHOICE-1))]}"
+
+        # Import bookmarks
+        if [[ -f "$SELECTED_FOLDER/bookmarks.json" ]]; then
+            jq -r '.[] | select(.key != null and .value != null) | "\(.key)=\(.value)"' "$SELECTED_FOLDER/bookmarks.json" > ~/.bookmarks
+        else
+            echo "No bookmarks.json found in $SELECTED_FOLDER."
+        fi
+
+        # Import command bookmarks
+        if [[ -f "$SELECTED_FOLDER/commands.json" ]]; then
+            jq -r '.[] | select(.key != null and .value != null) | "\(.key)=\(.value)"' "$SELECTED_FOLDER/commands.json" > ~/.cmd_bookmarks
+        else
+            echo "No commands.json found in $SELECTED_FOLDER."
+        fi
+
+        echo "Data imported successfully from $SELECTED_FOLDER."
+        ;;
+esac

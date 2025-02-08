@@ -1,0 +1,91 @@
+#!/bin/bash
+
+# Define the bookmark file location
+BOOKMARK_FILE=~/.bookmarks
+
+# Ensure the bookmark file exists
+touch "$BOOKMARK_FILE"
+
+# Function to add a bookmark
+add_bookmark() {
+    local name="$1"
+    local path="$2"
+    if [[ -z "$name" || -z "$path" ]]; then
+        echo "Usage: bookmark add <name> <path>"
+        return 1
+    fi
+    if grep -q "^$name=" "$BOOKMARK_FILE"; then
+        echo "Bookmark '$name' already exists. Use 'bookmark update' to modify it."
+        return 1
+    fi
+    echo "$name=$path" >> "$BOOKMARK_FILE"
+    echo "Bookmark '$name' added for path '$path'."
+}
+
+# Function to list bookmarks
+list_bookmarks() {
+    if [[ ! -s "$BOOKMARK_FILE" ]]; then
+        echo "No bookmarks found."
+        return 0
+    fi
+    echo "Bookmarks:"
+    cat "$BOOKMARK_FILE" | while IFS='=' read -r name path; do
+        echo "  $name -> $path"
+    done
+}
+
+# Function to remove a bookmark
+remove_bookmark() {
+    local name="$1"
+    if [[ -z "$name" ]]; then
+        echo "Usage: bookmark remove <name>"
+        return 1
+    fi
+    if ! grep -q "^$name=" "$BOOKMARK_FILE"; then
+        echo "Bookmark '$name' not found."
+        return 1
+    fi
+    sed -i '' "/^$name=/d" "$BOOKMARK_FILE"
+    echo "Bookmark '$name' removed."
+}
+
+# Function to go to a bookmarked directory
+go_to_bookmark() {
+    local name="$1"
+    if [[ -z "$name" ]]; then
+        echo "Usage: bookmark go <name>"
+        return 1
+    fi
+    local path=$(grep "^$name=" "$BOOKMARK_FILE" | cut -d '=' -f 2)
+    if [[ -z "$path" ]]; then
+        echo "Bookmark '$name' not found."
+        return 1
+    fi
+    cd "$path" || echo "Failed to navigate to '$path'."
+}
+
+# Main logic
+case "$1" in
+    add)
+        add_bookmark "$2" "$3"
+        ;;
+    list)
+        list_bookmarks
+        ;;
+    remove)
+        remove_bookmark "$2"
+        ;;
+    go)
+        go_to_bookmark "$2"
+        ;;
+    *)
+        echo "Usage:"
+        echo "  bookmark add <name> <path>    - Add a bookmark"
+        echo "  bookmark list                - List all bookmarks"
+        echo "  bookmark remove <name>       - Remove a bookmark"
+        echo "  bookmark go <name>           - Navigate to a bookmark"
+        ;;
+esac
+list_bookmark_names() {
+    cut -d '=' -f 1 "$BOOKMARK_FILE" 2>/dev/null
+}

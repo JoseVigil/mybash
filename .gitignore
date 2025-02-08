@@ -1,0 +1,21 @@
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# SQLite Database
+*.sqlite
+*.db
+
+# JSON data (si manejas datos sensibles)
+*.json
+
+# Virtual environment (si usas venv en Python)
+venv/
+.env
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
