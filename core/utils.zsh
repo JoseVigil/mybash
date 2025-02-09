@@ -45,20 +45,3 @@ myip() {
     fi
     echo "IP Address: $ip_address"
 }
-
-# Load a file into memory
-load_file() {
-    local file="$1"
-    if [[ -z "$file" ]]; then
-        echo "Usage: load_file <file>"
-        return 1
-    fi
-
-    if [[ ! -f "$file" ]]; then
-        echo "Error: File '$file' not found."
-        return 1
-    fi
-
-    echo "Loading file: $file"
-    cat "$file"
-}

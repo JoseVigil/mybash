@@ -1,4 +1,7 @@
-# Core functionality
+# Initialize the database
+source "$MYBASH_DIR/db/dbhelper.zsh"
+init_db
+
 # Core functionality
 core_init() {
     echo "Initializing MyBash Core..."

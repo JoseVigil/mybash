@@ -25,3 +25,18 @@ mybash_tree() {
         echo "Tree view is not supported on this OS."
     fi
 }
+
+# Tool: Window Manager
+list_windows() {
+    echo "Open windows in the current terminal session:"
+    tmux list-windows 2>/dev/null || echo "No tmux sessions found."
+}
+
+focus_window() {
+    local window="$1"
+    if [[ -z "$window" ]]; then
+        echo "Usage: focus <window_number>"
+        return 1
+    fi
+    tmux select-window -t "$window" 2>/dev/null || echo "Window $window not found."
+}
