@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Variables
-MYBASH_DIR="$HOME/mybash"
+MYBASH_DIR="$HOME/repos/mybash"
 MYBASH_DATA_DIR="$HOME/Documents/mybash"
 
 # Function to remove symbolic links
@@ -24,7 +24,7 @@ remove_from_zshrc() {
 
 # Function to optionally delete the mybash directory
 delete_mybash_dir() {
-    read -p "Do you want to delete the mybash directory? (y/n): " choice
+    read -p "Do you want to delete the mybash directory ($MYBASH_DIR)? (y/n): " choice
     if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
         echo "Deleting $MYBASH_DIR..."
         rm -rf "$MYBASH_DIR"
@@ -51,13 +51,5 @@ remove_symlinks
 remove_from_zshrc
 delete_mybash_dir
 delete_mybash_data_dir
-
-# Reload shell configuration only if the mybash directory was not deleted
-if [[ -z "$MYBASH_DELETED" ]]; then
-    echo "Reloading shell configuration..."
-    source ~/.zshrc
-else
-    echo "Skipping shell configuration reload because mybash directory was deleted."
-fi
 
 echo "Uninstallation complete."

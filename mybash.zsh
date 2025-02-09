@@ -1,112 +1,132 @@
-# mybash.zsh
+#!/bin/bash
 
-# Load environment variables from .env file
-if [[ -f "$MYBASH_DIR/.env" ]]; then
-    export $(grep -v '^#' "$MYBASH_DIR/.env" | xargs)
+# Variables
+MYBASH_DIR="$HOME/repos/mybash"
+MYBASH_DATA_DIR="$HOME/Documents/mybash"
+LOG_DIR="$MYBASH_DATA_DIR/log"
+LOG_FILE="$LOG_DIR/install.log"
+
+# Optional: Create $HOME/mybash if needed
+CREATE_HOME_MYBASH=false  # Set to true if you want to create $HOME/mybash
+if [[ "$CREATE_HOME_MYBASH" == true ]]; then
+    HOME_MYBASH_DIR="$HOME/mybash"
+    mkdir -p "$HOME_MYBASH_DIR"
 fi
 
-# Default values if not set in .env
-MYBASH_ENV=${MYBASH_ENV:-"production"}
-MYBASH_DIR=${MYBASH_DIR:-"$HOME/mybash"}
-MYBASH_VERSION=${MYBASH_VERSION:-"1.0.0"}
-
-echo "Running in $MYBASH_ENV mode"
-echo "MyBash Directory: $MYBASH_DIR"
-echo "Version: $MYBASH_VERSION"
-
-# Load core functionality
-core_init() {
-    echo "Initializing MyBash Core..."
-    source "$MYBASH_DIR/core/utils.zsh"
-    source "$MYBASH_DIR/core/bkm.zsh"
-    source "$MYBASH_DIR/core/cmd.zsh"
-    source "$MYBASH_DIR/core/synch.zsh"
+# Function to log messages
+log_message() {
+    mkdir -p "$LOG_DIR"  # Ensure the log directory exists
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
 }
 
-# Load plugins dynamically
-load_plugins() {
-    if [[ -d "$MYBASH_DIR/plugins" ]]; then
-        for plugin in "$MYBASH_DIR/plugins"/*.zsh; do
-            if [[ -f "$plugin" ]]; then
-                echo "Loading plugin: $plugin"
-                source "$plugin"
-            fi
-        done
+# Install dependencies
+install_dependencies() {
+    log_message "Installing dependencies..."
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        if ! command -v brew &>/dev/null; then
+            log_message "Homebrew not found. Installing Homebrew..."
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
+
+        # Check and install Python@3.13
+        if brew list python@3.13 &>/dev/null; then
+            log_message "Python@3.13 is already installed. Skipping installation."
+        else
+            log_message "Installing Python@3.13..."
+            brew install python@3.13
+        fi
+
+        # Check and install tree
+        if brew list tree &>/dev/null; then
+            log_message "Tree is already installed. Skipping installation."
+        else
+            log_message "Installing Tree..."
+            brew install tree
+        fi
+
+        # Check and install jq
+        if brew list jq &>/dev/null; then
+            log_message "jq is already installed. Skipping installation."
+        else
+            log_message "Installing jq..."
+            brew install jq
+        fi
+    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+        # Linux
+        sudo apt update
+        sudo apt install -y tree jq python3
     else
-        echo "No plugins directory found."
+        log_message "Unsupported OS. Please install dependencies manually."
+        return 1
     fi
 }
 
-# Load tools dynamically
-load_tools() {
-    if [[ -d "$MYBASH_DIR/tools" ]]; then
-        for tool in "$MYBASH_DIR/tools"/*.zsh; do
-            if [[ -f "$tool" ]]; then
-                echo "Loading tool: $tool"
-                source "$tool"
-            fi
-        done
+# Create symbolic links
+create_symlinks() {
+    log_message "Creating symbolic links in /usr/local/bin..."
+    if [[ -f "$MYBASH_DIR/mybash.zsh" ]]; then
+        ln -sf "$MYBASH_DIR/mybash.zsh" /usr/local/bin/mybash
+        log_message "Created symlink for mybash.zsh."
     else
-        echo "No tools directory found."
+        log_message "Error: mybash.zsh not found in $MYBASH_DIR."
+        exit 1
+    fi
+
+    if [[ -f "$MYBASH_DIR/tools/mypy.zsh" ]]; then
+        ln -sf "$MYBASH_DIR/tools/mypy.zsh" /usr/local/bin/mypy
+        log_message "Created symlink for mypy.zsh."
+    else
+        log_message "Warning: mypy.zsh not found in $MYBASH_DIR/tools. Skipping symlink creation."
     fi
 }
 
-# Load utilities
-load_utils() {
-    if [[ -f "$MYBASH_DIR/utils/utils.zsh" ]]; then
-        echo "Loading utility: $MYBASH_DIR/utils/utils.zsh"
-        source "$MYBASH_DIR/utils/utils.zsh"
+# Add mybash.zsh to ~/.zshrc
+add_to_zshrc() {
+    log_message "Adding mybash.zsh to ~/.zshrc..."
+    if [[ -f "$MYBASH_DIR/mybash.zsh" ]]; then
+        if ! grep -q "source $MYBASH_DIR/mybash.zsh" ~/.zshrc; then
+            echo "source $MYBASH_DIR/mybash.zsh" >> ~/.zshrc
+            log_message "Added mybash.zsh to ~/.zshrc."
+        else
+            log_message "mybash.zsh is already in ~/.zshrc."
+        fi
     else
-        echo "No general utilities found."
-    fi
-    if [[ -f "$MYBASH_DIR/utils/views.zsh" ]]; then
-        echo "Loading views: $MYBASH_DIR/utils/views.zsh"
-        source "$MYBASH_DIR/utils/views.zsh"
-    else
-        echo "No view utilities found."
+        log_message "Error: mybash.zsh not found in $MYBASH_DIR."
+        exit 1
     fi
 }
 
-# Initialize MyBash
-core_init
-load_plugins
-load_tools
-load_utils
-
-# Function to display general help
-display_help() {
-    echo "Usage: mybash <command> [options]"
-    echo "Available commands:"
-    echo "  bkm      Manage bookmarks (add, list, remove)."
-    echo "  cmd      Manage custom commands (add, list, remove)."
-    echo "  help     Show this help message."
-    echo ""
-    echo "Examples:"
-    echo "  mybash bkm add my_project ~/Projects/my_project"
-    echo "  mybash cmd add gs 'git status'"
-    echo "  mybash help"
+# Create data directories
+create_data_directories() {
+    log_message "Creating data directories in $MYBASH_DATA_DIR..."
+    mkdir -p "$MYBASH_DATA_DIR/log"
+    mkdir -p "$MYBASH_DATA_DIR/migrate/import"
+    mkdir -p "$MYBASH_DATA_DIR/migrate/export"
+    mkdir -p "$MYBASH_DATA_DIR/adapters/stickies"
+    log_message "Data directories created successfully."
 }
 
-# Main logic for the master interpreter
-if [[ $# -eq 0 ]]; then
-    display_help
-    exit 0
-fi
-
+# Main logic
 case "$1" in
-    bkm)
-        shift
-        bkm "$@"
+    dependencies)
+        install_dependencies
         ;;
-    cmd)
-        shift
-        cmd "$@"
+    symlinks)
+        create_symlinks
         ;;
-    help)
-        display_help
+    zshrc)
+        add_to_zshrc
+        ;;
+    data)
+        create_data_directories
         ;;
     *)
-        echo "Unknown command: $1"
-        echo "Run 'mybash help' for usage information."
+        install_dependencies
+        create_symlinks
+        add_to_zshrc
+        create_data_directories
+        log_message "Installation complete. Please open a new terminal to apply changes."
+        echo "Installation complete. Please check the log file at $LOG_FILE for details."
         ;;
 esac
