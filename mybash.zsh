@@ -1,53 +1,73 @@
-# Function to display help
-mybash_help() {
-    echo -e "\e[1;34mMyBash Utilities:\e[0m"
-    echo "-----------------"
-    echo -e "\e[1;32mShortcuts (Direct Commands):\e[0m"
-    echo -e "  \e[32mcpwd\e[0m          - Copy current directory path to clipboard (macOS: pbcopy, Linux: xclip)"
-    echo -e "  \e[32mlargefiles\e[0m    - List the largest files in the current directory"
-    echo "                    Usage: largefiles [count] (default: 10)"
-    echo -e "  \e[32mopendir\e[0m       - Open the current directory in Finder (macOS: open, Linux: xdg-open)"
-    echo -e "  \e[32mmkcd\e[0m          - Create a directory and navigate into it"
-    echo "                    Usage: mkcd <directory_name>"
-    echo -e "  \e[32mmyip\e[0m          - Display the Wi-Fi IP address (macOS/Linux/WSL)"
-    echo -e "  \e[32mbkm\e[0m           - Bookmark directories (add, list, remove)"
-    echo "                    Usage: bkm <name> to navigate to a bookmarked directory"
-    echo "                    Examples:"
-    echo "                      bkm add proj ~/Projects/my_project"
-    echo "                      bkm proj"
-    echo "                      bkm list"
-    echo "                      bkm remove proj"
-    echo -e "  \e[32mcmd\e[0m           - Bookmark commands (add, list, remove)"
-    echo "                    Usage: cmd <name> to execute a bookmarked command"
-    echo "                    Examples:"
-    echo "                      cmd add gs 'git status'"
-    echo "                      cmd gs"
-    echo "                      cmd list"
-    echo "                      cmd remove gs"
-    echo ""
-    echo -e "\e[1;32mMyBash Commands (Use 'mybash' or 'mb'):\e[0m"
-    echo "  export        - Export bookmarks and commands to ~/Documents/mybash/export"
-    echo "  import        - Import bookmarks and commands from ~/Documents/mybash/export"
-    echo "  empty         - Empty a file after confirmation"
-    echo "                  Usage: mybash empty <filename>"
-    echo "  clean         - Alias for 'empty'. Clears the content of a file after confirmation."
-    echo ""
-    echo -e "\e[1;32mDependencies:\e[0m"
-    echo "  - jq: Required for exporting and importing data in JSON format."
-    echo "        Install via Homebrew (macOS): brew install jq"
-    echo "        Install via apt (Linux): sudo apt install jq"
-    echo "        Install via yum (Linux): sudo yum install jq"
-    echo "  - xclip/xsel: Required for clipboard functionality on Linux."
-    echo "        Install via apt: sudo apt install xclip"
-    echo ""
-    echo -e "\e[1;32mUsage:\e[0m"
-    echo "  mybash --help - Show this help message"
-    echo "  mb --help     - Same as above (alias for 'mybash')"
-    echo ""
-    echo -e "\e[1;32mTips:\e[0m"
-    echo "-----"
-    echo "1. Use 'bkm' and 'cmd' to save time by bookmarking frequently used paths and commands."
-    echo "2. Combine 'mybash export' and 'mybash import' to back up your configuration across devices."
-    echo "3. Use 'mybash clean' or 'mybash empty' to quickly reset log files or temporary data."
-    echo "4. Ensure dependencies like 'jq' and 'xclip' are installed for full functionality."
+# Load environment variables from .env file
+if [[ -f "\$MYBASH_DIR/.env" ]]; then
+    export \$(grep -v '^#' "\$MYBASH_DIR/.env" | xargs)
+fi
+
+# Default values if not set in .env
+MYBASH_ENV=\${MYBASH_ENV:-"production"}
+MYBASH_DIR=\${MYBASH_DIR:-"\$HOME/mybash"}
+MYBASH_VERSION=\${MYBASH_VERSION:-"1.0.0"}
+
+echo "Running in \$MYBASH_ENV mode"
+echo "MyBash Directory: \$MYBASH_DIR"
+echo "Version: \$MYBASH_VERSION"
+
+# Load core functionality
+core_init() {
+    echo "Initializing MyBash Core..."
+    source "$MYBASH_DIR/core/utils.zsh"
+    source "$MYBASH_DIR/core/bkm.zsh"
+    source "$MYBASH_DIR/core/cmd.zsh"
+    source "$MYBASH_DIR/core/synch.zsh"
 }
+
+# Load plugins dynamically
+load_plugins() {
+    if [[ -d "\$MYBASH_DIR/plugins" ]]; then
+        for plugin in "\$MYBASH_DIR/plugins"/*.zsh; do
+            if [[ -f "\$plugin" ]]; then
+                echo "Loading plugin: \$plugin"
+                source "\$plugin"
+            fi
+        done
+    else
+        echo "No plugins directory found."
+    fi
+}
+
+# Load tools dynamically
+load_tools() {
+    if [[ -d "\$MYBASH_DIR/tools" ]]; then
+        for tool in "\$MYBASH_DIR/tools"/*.zsh; do
+            if [[ -f "\$tool" ]]; then
+                echo "Loading tool: \$tool"
+                source "\$tool"
+            fi
+        done
+    else
+        echo "No tools directory found."
+    fi
+}
+
+# Load utilities
+load_utils() {
+    if [[ -f "$MYBASH_DIR/utils/utils.zsh" ]]; then
+        echo "Loading utility: $MYBASH_DIR/utils/utils.zsh"
+        source "$MYBASH_DIR/utils/utils.zsh"
+    else
+        echo "No general utilities found."
+    fi
+
+    if [[ -f "$MYBASH_DIR/utils/views.zsh" ]]; then
+        echo "Loading views: $MYBASH_DIR/utils/views.zsh"
+        source "$MYBASH_DIR/utils/views.zsh"
+    else
+        echo "No view utilities found."
+    fi
+}
+
+# Initialize MyBash
+core_init
+load_plugins
+load_tools
+load_utils
