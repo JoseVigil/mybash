@@ -63,25 +63,26 @@ load_file() {
     cat "$file"
 }
 
-# Function to create a backup of the mybash project
-function mybash_backup() {
-    # Define backup directory
-    BACKUP_DIR="$HOME/Documents/mybash/backup"
+# Backup command
+mybash_backup() {
+    BACKUP_DIR="$MYBASH_DATA_DIR/backup"
     TIMESTAMP=$(date '+%Y%m%d%H%M%S')
     BACKUP_PATH="$BACKUP_DIR/mybash-backup-$TIMESTAMP"
 
     # Ensure the backup directory exists
-    mkdir -p "$BACKUP_DIR"
+    mkdir -p "$BACKUP_PATH"
 
     # Copy the entire mybash repository to the backup location
     echo "Creating backup of $MYBASH_DIR in $BACKUP_PATH..."
-    cp -r "$MYBASH_DIR" "$BACKUP_PATH"
+    cp -r "$MYBASH_DIR"/* "$BACKUP_PATH"
 
     # Log the backup creation
     if [[ -d "$BACKUP_PATH" ]]; then
         echo "Backup created successfully: $BACKUP_PATH"
+        log_message "Backup created successfully: $BACKUP_PATH"
     else
         echo "Error: Backup failed."
+        log_message "Error: Backup failed."
         return 1
     fi
 }
