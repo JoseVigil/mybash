@@ -18,7 +18,6 @@ if [[ "$CREATE_HOME_MYBASH" == true ]]; then
     HOME_MYBASH_DIR="$HOME/mybash"
     mkdir -p "$HOME_MYBASH_DIR"
     log_message "Created directory $HOME_MYBASH_DIR."
-
     # Copy necessary files to $HOME/mybash
     cp -r "$MYBASH_DIR/core" "$HOME_MYBASH_DIR/" 2>/dev/null || true
     cp -r "$MYBASH_DIR/db" "$HOME_MYBASH_DIR/" 2>/dev/null || true
@@ -39,7 +38,6 @@ install_dependencies() {
             log_message "Homebrew not found. Installing Homebrew..."
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         fi
-
         # Check and install Python@3.13
         if brew list python@3.13 &>/dev/null; then
             log_message "Python@3.13 is already installed. Skipping installation."
@@ -47,7 +45,6 @@ install_dependencies() {
             log_message "Installing Python@3.13..."
             brew install python@3.13
         fi
-
         # Check and install tree
         if brew list tree &>/dev/null; then
             log_message "Tree is already installed. Skipping installation."
@@ -55,7 +52,6 @@ install_dependencies() {
             log_message "Installing Tree..."
             brew install tree
         fi
-
         # Check and install jq
         if brew list jq &>/dev/null; then
             log_message "jq is already installed. Skipping installation."
@@ -66,11 +62,40 @@ install_dependencies() {
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
         # Linux
         sudo apt update
-        sudo apt install -y tree jq python3
+        sudo apt install -y tree jq python3 python3-pip
     else
         log_message "Unsupported OS. Please install dependencies manually."
         return 1
     fi
+
+    # Install psutil in a virtual environment
+    log_message "Setting up Python virtual environment for mybash..."
+    MYBASH_VENV="$MYBASH_DATA_DIR/venv"
+    if [[ ! -d "$MYBASH_VENV" ]]; then
+        log_message "Creating virtual environment at $MYBASH_VENV..."
+        python3 -m venv "$MYBASH_VENV"
+    fi
+
+    # Activate the virtual environment
+    source "$MYBASH_VENV/bin/activate"
+
+    # Upgrade pip to avoid issues
+    log_message "Upgrading pip in the virtual environment..."
+    pip install --upgrade pip
+
+    # Install psutil
+    log_message "Installing psutil in the virtual environment..."
+    if ! pip install psutil; then
+        log_message "Error: Failed to install 'psutil'."
+        echo "Error: Failed to install 'psutil'. Check the output above for details."
+        exit 1
+    else
+        log_message "Successfully installed 'psutil'."
+        echo "Successfully installed 'psutil'."
+    fi
+
+    # Deactivate the virtual environment
+    deactivate
 }
 
 # Create symbolic links
@@ -84,7 +109,6 @@ create_symlinks() {
         log_message "Error: mybash.zsh not found in $MYBASH_DIR."
         exit 1
     fi
-
     log_message "Checking for mypy.zsh in $MYBASH_DIR/tools..."
     if [[ -f "$MYBASH_DIR/tools/mypy.zsh" ]]; then
         chmod +x "$MYBASH_DIR/tools/mypy.zsh"  # Ensure mypy.zsh is executable

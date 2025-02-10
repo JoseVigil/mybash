@@ -1,5 +1,4 @@
 # tools/py/modules/log.py
-
 import os
 import sys
 import psutil
@@ -29,7 +28,6 @@ def get_metadata(command_name, args):
         "env_vars": env_vars,
         "process_info": process_info,
     }
-
     return str(metadata)
 
 if __name__ == "__main__":

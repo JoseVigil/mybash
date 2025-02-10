@@ -1,14 +1,11 @@
 # core/cmd.zsh
-
 CMD_BOOKMARK_FILE="$HOME/Documents/mybash/adapters/commands"
 
-cmd() {
+cmd_main() {
     log_event "$0" "$@"  # Logging with one line
-
     local action="$1"
     local name="$2"
     local command="$3"
-
     case "$action" in
         add)
             if [[ -z "$name" || -z "$command" ]]; then

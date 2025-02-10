@@ -124,6 +124,20 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 
 ---
 
+# Sticky Notes Plugin
+
+This plugin allows you to manage sticky notes using a SQLite database.
+
+## Usage
+
+- `sticky create <title> <content>`: Create a new sticky note.
+- `sticky list`: List all sticky notes.
+- `sticky delete <title>`: Delete a sticky note by title.
+- `sticky help`: Show help information.
+
+
+---
+
 ## � Contact
 
 Have questions or feedback? Let’s connect! ✉️�
