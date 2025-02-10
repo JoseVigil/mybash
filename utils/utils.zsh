@@ -62,3 +62,33 @@ load_file() {
     echo "Loading file: $file"
     cat "$file"
 }
+
+# Function to create a backup of the mybash project
+function mybash_backup() {
+    # Define backup directory
+    BACKUP_DIR="$HOME/Documents/mybash/backup"
+    TIMESTAMP=$(date '+%Y%m%d%H%M%S')
+    BACKUP_PATH="$BACKUP_DIR/mybash-backup-$TIMESTAMP"
+
+    # Ensure the backup directory exists
+    mkdir -p "$BACKUP_DIR"
+
+    # Copy the entire mybash repository to the backup location
+    echo "Creating backup of $MYBASH_DIR in $BACKUP_PATH..."
+    cp -r "$MYBASH_DIR" "$BACKUP_PATH"
+
+    # Log the backup creation
+    if [[ -d "$BACKUP_PATH" ]]; then
+        echo "Backup created successfully: $BACKUP_PATH"
+    else
+        echo "Error: Backup failed."
+        return 1
+    fi
+}
+
+# Function to clean old backups
+function mybash_clean_backups() {
+    BACKUP_DIR="$HOME/Documents/mybash/backup"
+    find "$BACKUP_DIR" -type d -mtime +7 -exec rm -rf {} \;
+    echo "Old backups deleted from $BACKUP_DIR."
+}

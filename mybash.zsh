@@ -6,6 +6,9 @@ MYBASH_DATA_DIR="$HOME/Documents/mybash"
 LOG_DIR="$MYBASH_DATA_DIR/log"
 LOG_FILE="$LOG_DIR/install.log"
 
+# Load utility functions
+source "$MYBASH_DIR/utils/utils.zsh"
+
 # Optional: Create $HOME/mybash if needed
 CREATE_HOME_MYBASH=false  # Set to true if you want to create $HOME/mybash
 if [[ "$CREATE_HOME_MYBASH" == true ]]; then
@@ -28,7 +31,6 @@ install_dependencies() {
             log_message "Homebrew not found. Installing Homebrew..."
             /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
         fi
-
         # Check and install Python@3.13
         if brew list python@3.13 &>/dev/null; then
             log_message "Python@3.13 is already installed. Skipping installation."
@@ -36,7 +38,6 @@ install_dependencies() {
             log_message "Installing Python@3.13..."
             brew install python@3.13
         fi
-
         # Check and install tree
         if brew list tree &>/dev/null; then
             log_message "Tree is already installed. Skipping installation."
@@ -44,7 +45,6 @@ install_dependencies() {
             log_message "Installing Tree..."
             brew install tree
         fi
-
         # Check and install jq
         if brew list jq &>/dev/null; then
             log_message "jq is already installed. Skipping installation."
@@ -72,7 +72,6 @@ create_symlinks() {
         log_message "Error: mybash.zsh not found in $MYBASH_DIR."
         exit 1
     fi
-
     if [[ -f "$MYBASH_DIR/tools/mypy.zsh" ]]; then
         ln -sf "$MYBASH_DIR/tools/mypy.zsh" /usr/local/bin/mypy
         log_message "Created symlink for mypy.zsh."
@@ -107,8 +106,32 @@ create_data_directories() {
     log_message "Data directories created successfully."
 }
 
+# Help command
+show_help() {
+    echo "Usage: mybash [command]"
+    echo ""
+    echo "Available commands:"
+    echo "  help         Show this help message"
+    echo "  install      Perform a full installation of mybash"
+    echo "  dependencies Install required dependencies"
+    echo "  symlinks     Create symbolic links"
+    echo "  zshrc        Add mybash.zsh to ~/.zshrc"
+    echo "  data         Create data directories"
+}
+
 # Main logic
 case "$1" in
+    help)
+        show_help
+        ;;
+    install)
+        install_dependencies
+        create_symlinks
+        add_to_zshrc
+        create_data_directories
+        log_message "Installation complete. Please open a new terminal to apply changes."
+        echo "Installation complete. Please check the log file at $LOG_FILE for details."
+        ;;
     dependencies)
         install_dependencies
         ;;
@@ -122,11 +145,8 @@ case "$1" in
         create_data_directories
         ;;
     *)
-        install_dependencies
-        create_symlinks
-        add_to_zshrc
-        create_data_directories
-        log_message "Installation complete. Please open a new terminal to apply changes."
-        echo "Installation complete. Please check the log file at $LOG_FILE for details."
+        echo "Unknown command: $1"
+        show_help
+        exit 1
         ;;
 esac

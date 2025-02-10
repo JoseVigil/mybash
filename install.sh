@@ -1,16 +1,34 @@
 #!/bin/bash
 
-# Variables
-MYBASH_DIR="$HOME/repos/mybash"
-MYBASH_DATA_DIR="$HOME/Documents/mybash"
-LOG_DIR="$MYBASH_DATA_DIR/log"
-LOG_FILE="$LOG_DIR/install.log"
-
 # Function to log messages
 log_message() {
     mkdir -p "$LOG_DIR"  # Ensure the log directory exists
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
 }
+
+# Variables
+MYBASH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MYBASH_DATA_DIR="$HOME/Documents/mybash"
+LOG_DIR="$MYBASH_DATA_DIR/log"
+LOG_FILE="$LOG_DIR/install.log"
+
+# Optional: Create $HOME/mybash if needed
+CREATE_HOME_MYBASH=true  # Set to false if you don't need this directory
+if [[ "$CREATE_HOME_MYBASH" == true ]]; then
+    HOME_MYBASH_DIR="$HOME/mybash"
+    mkdir -p "$HOME_MYBASH_DIR"
+    log_message "Created directory $HOME_MYBASH_DIR."
+
+    # Copy necessary files to $HOME/mybash
+    cp -r "$MYBASH_DIR/core" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp -r "$MYBASH_DIR/db" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp -r "$MYBASH_DIR/plugins" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp -r "$MYBASH_DIR/tools" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp -r "$MYBASH_DIR/utils" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp "$MYBASH_DIR/mybash.zsh" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp "$MYBASH_DIR/version" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    log_message "Copied necessary files to $HOME_MYBASH_DIR."
+fi
 
 # Install dependencies
 install_dependencies() {
@@ -57,8 +75,9 @@ install_dependencies() {
 
 # Create symbolic links
 create_symlinks() {
-    log_message "Creating symbolic links in /usr/local/bin..."
+    log_message "Checking for mybash.zsh in $MYBASH_DIR..."
     if [[ -f "$MYBASH_DIR/mybash.zsh" ]]; then
+        chmod +x "$MYBASH_DIR/mybash.zsh"  # Ensure mybash.zsh is executable
         ln -sf "$MYBASH_DIR/mybash.zsh" /usr/local/bin/mybash
         log_message "Created symlink for mybash.zsh."
     else
@@ -66,7 +85,9 @@ create_symlinks() {
         exit 1
     fi
 
+    log_message "Checking for mypy.zsh in $MYBASH_DIR/tools..."
     if [[ -f "$MYBASH_DIR/tools/mypy.zsh" ]]; then
+        chmod +x "$MYBASH_DIR/tools/mypy.zsh"  # Ensure mypy.zsh is executable
         ln -sf "$MYBASH_DIR/tools/mypy.zsh" /usr/local/bin/mypy
         log_message "Created symlink for mypy.zsh."
     else
@@ -76,7 +97,7 @@ create_symlinks() {
 
 # Add mybash.zsh to ~/.zshrc
 add_to_zshrc() {
-    log_message "Adding mybash.zsh to ~/.zshrc..."
+    log_message "Checking for mybash.zsh in $MYBASH_DIR..."
     if [[ -f "$MYBASH_DIR/mybash.zsh" ]]; then
         if ! grep -q "source $MYBASH_DIR/mybash.zsh" ~/.zshrc; then
             echo "source $MYBASH_DIR/mybash.zsh" >> ~/.zshrc
@@ -93,10 +114,10 @@ add_to_zshrc() {
 # Create data directories
 create_data_directories() {
     log_message "Creating data directories in $MYBASH_DATA_DIR..."
+    mkdir -p "$MYBASH_DATA_DIR/adapters/stickies"
     mkdir -p "$MYBASH_DATA_DIR/log"
     mkdir -p "$MYBASH_DATA_DIR/migrate/import"
     mkdir -p "$MYBASH_DATA_DIR/migrate/export"
-    mkdir -p "$MYBASH_DATA_DIR/adapters/stickies"
     log_message "Data directories created successfully."
 }
 
