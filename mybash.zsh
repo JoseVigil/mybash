@@ -12,15 +12,15 @@ LOG_FILE="$LOG_DIR/install.log"
 CREATE_HOME_MYBASH="${CREATE_HOME_MYBASH:-false}"
 
 # Load .env file if it exists
-ENV_FILE="$HOME/repos/mybash/.env"
-if [[ -f "$ENV_FILE" ]]; then
-    echo "Loading environment variables from $ENV_FILE..."
-    set -a  # Export all variables
-    source "$ENV_FILE"
-    set +a  # Stop exporting
-else
-    echo "Warning: .env file not found. Using default values."
-fi
+#ENV_FILE="$HOME/repos/mybash/.env"
+#if [[ -f "$ENV_FILE" ]]; then
+#    echo "Loading environment variables from $ENV_FILE..."
+#    set -a  # Export all variables
+#    source "$ENV_FILE"
+#    set +a  # Stop exporting
+#else
+#    echo "Warning: .env file not found. Using default values."
+#fi
 
 # Ensure log directory exists
 mkdir -p "$LOG_DIR"
@@ -72,14 +72,14 @@ else
 fi
 
 # Load plugins
-if [[ -f "$MYBASH_DIR/plugins/sticky_notes/main.zsh" ]]; then
-    echo "Loading sticky_notes plugin from $MYBASH_DIR/plugins/sticky_notes/main.zsh..."
-    source "$MYBASH_DIR/plugins/sticky_notes/main.zsh"
-else
-    echo "Error: Plugin script 'sticky_notes/main.zsh' not found."
-    log_message "Error: Plugin script 'sticky_notes/main.zsh' not found."
-    exit 1
-fi
+#if [[ -f "$MYBASH_DIR/plugins/sticky_notes/main.zsh" ]]; then
+#    echo "Loading sticky_notes plugin from $MYBASH_DIR/plugins/sticky_notes/main.zsh..."
+#    source "$MYBASH_DIR/plugins/sticky_notes/main.zsh"
+#else
+#    echo "Error: Plugin script 'sticky_notes/main.zsh' not found."
+#    log_message "Error: Plugin script 'sticky_notes/main.zsh' not found."
+#    exit 1
+#fi
 
 # Install dependencies
 install_dependencies() {

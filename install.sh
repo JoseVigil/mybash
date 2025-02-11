@@ -13,20 +13,9 @@ LOG_DIR="$MYBASH_DATA_DIR/log"
 LOG_FILE="$LOG_DIR/install.log"
 
 # Optional: Create $HOME/mybash if needed
-CREATE_HOME_MYBASH=true  # Set to false if you don't need this directory
-if [[ "$CREATE_HOME_MYBASH" == true ]]; then
-    HOME_MYBASH_DIR="$HOME/mybash"
-    mkdir -p "$HOME_MYBASH_DIR"
-    log_message "Created directory $HOME_MYBASH_DIR."
-    # Copy necessary files to $HOME/mybash
-    cp -r "$MYBASH_DIR/core" "$HOME_MYBASH_DIR/" 2>/dev/null || true
-    cp -r "$MYBASH_DIR/db" "$HOME_MYBASH_DIR/" 2>/dev/null || true
-    cp -r "$MYBASH_DIR/plugins" "$HOME_MYBASH_DIR/" 2>/dev/null || true
-    cp -r "$MYBASH_DIR/tools" "$HOME_MYBASH_DIR/" 2>/dev/null || true
-    cp -r "$MYBASH_DIR/utils" "$HOME_MYBASH_DIR/" 2>/dev/null || true
-    cp "$MYBASH_DIR/mybash.zsh" "$HOME_MYBASH_DIR/" 2>/dev/null || true
-    cp "$MYBASH_DIR/version" "$HOME_MYBASH_DIR/" 2>/dev/null || true
-    log_message "Copied necessary files to $HOME_MYBASH_DIR."
+CREATE_HOME_MYBASH=false  # Default is false (development mode)
+if [[ "$1" == "--prod" ]]; then
+    CREATE_HOME_MYBASH=true
 fi
 
 # Install dependencies
@@ -98,30 +87,37 @@ install_dependencies() {
     deactivate
 }
 
-# Create symbolic links
-create_symlinks() {
-    log_message "Checking for mybash.zsh in $MYBASH_DIR..."
-    if [[ -f "$MYBASH_DIR/mybash.zsh" ]]; then
-        chmod +x "$MYBASH_DIR/mybash.zsh"  # Ensure mybash.zsh is executable
-        ln -sf "$MYBASH_DIR/mybash.zsh" /usr/local/bin/mybash
-        log_message "Created symlink for mybash.zsh."
-    else
-        log_message "Error: mybash.zsh not found in $MYBASH_DIR."
-        exit 1
-    fi
-    log_message "Checking for mypy.zsh in $MYBASH_DIR/tools..."
-    if [[ -f "$MYBASH_DIR/tools/mypy.zsh" ]]; then
-        chmod +x "$MYBASH_DIR/tools/mypy.zsh"  # Ensure mypy.zsh is executable
-        ln -sf "$MYBASH_DIR/tools/mypy.zsh" /usr/local/bin/mypy
-        log_message "Created symlink for mypy.zsh."
-    else
-        log_message "Warning: mypy.zsh not found in $MYBASH_DIR/tools. Skipping symlink creation."
-    fi
+# Copy files to $HOME/mybash for production mode
+copy_to_home_mybash() {
+    HOME_MYBASH_DIR="$HOME/mybash"
+    mkdir -p "$HOME_MYBASH_DIR"
+    log_message "Copying files to $HOME_MYBASH_DIR..."
+    cp -r "$MYBASH_DIR/core" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp -r "$MYBASH_DIR/db" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp -r "$MYBASH_DIR/plugins" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp -r "$MYBASH_DIR/tools" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp -r "$MYBASH_DIR/utils" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp "$MYBASH_DIR/mybash.zsh" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    cp "$MYBASH_DIR/version" "$HOME_MYBASH_DIR/" 2>/dev/null || true
+    log_message "Files copied successfully to $HOME_MYBASH_DIR."
+}
+
+# Create data directories
+create_data_directories() {
+    log_message "Creating data directories in $MYBASH_DATA_DIR..."
+    mkdir -p "$MYBASH_DATA_DIR/adapters/stickies"
+    mkdir -p "$MYBASH_DATA_DIR/log"
+    mkdir -p "$MYBASH_DATA_DIR/migrate/import"
+    mkdir -p "$MYBASH_DATA_DIR/migrate/export"
+    log_message "Data directories created successfully."
 }
 
 # Add mybash.zsh to ~/.zshrc
 add_to_zshrc() {
     log_message "Checking for mybash.zsh in $MYBASH_DIR..."
+    if [[ "$CREATE_HOME_MYBASH" == true ]]; then
+        MYBASH_DIR="$HOME/mybash"
+    fi
     if [[ -f "$MYBASH_DIR/mybash.zsh" ]]; then
         if ! grep -q "source $MYBASH_DIR/mybash.zsh" ~/.zshrc; then
             echo "source $MYBASH_DIR/mybash.zsh" >> ~/.zshrc
@@ -135,36 +131,29 @@ add_to_zshrc() {
     fi
 }
 
-# Create data directories
-create_data_directories() {
-    log_message "Creating data directories in $MYBASH_DATA_DIR..."
-    mkdir -p "$MYBASH_DATA_DIR/adapters/stickies"
-    mkdir -p "$MYBASH_DATA_DIR/log"
-    mkdir -p "$MYBASH_DATA_DIR/migrate/import"
-    mkdir -p "$MYBASH_DATA_DIR/migrate/export"
-    log_message "Data directories created successfully."
-}
-
 # Main logic
 case "$1" in
-    dependencies)
+    --prod)
+        CREATE_HOME_MYBASH=true
+        copy_to_home_mybash
         install_dependencies
-        ;;
-    symlinks)
-        create_symlinks
-        ;;
-    zshrc)
-        add_to_zshrc
-        ;;
-    data)
         create_data_directories
+        add_to_zshrc
+        log_message "Production installation complete. Please open a new terminal to apply changes."
+        echo "Production installation complete. Please check the log file at $LOG_FILE for details."
+        ;;
+    --dev)
+        CREATE_HOME_MYBASH=false
+        install_dependencies
+        create_data_directories
+        add_to_zshrc
+        log_message "Development installation complete. Please open a new terminal to apply changes."
+        echo "Development installation complete. Please check the log file at $LOG_FILE for details."
         ;;
     *)
-        install_dependencies
-        create_symlinks
-        add_to_zshrc
-        create_data_directories
-        log_message "Installation complete. Please open a new terminal to apply changes."
-        echo "Installation complete. Please check the log file at $LOG_FILE for details."
+        echo "Usage: bash install.sh [--prod | --dev]"
+        echo "  --prod   Install for production (files copied to \$HOME/mybash)"
+        echo "  --dev    Install for development (use repository directly)"
+        exit 1
         ;;
 esac
