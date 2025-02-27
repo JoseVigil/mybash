@@ -53,7 +53,7 @@ if [[ ! -f "$DEPENDENCIES_CONF" ]]; then
 fi
 
 # Define plugins directory and config
-PLUGINS_DIR="$MYBASH_DATA_DIR/plugins"
+PLUGINS_DIR="$MYBASH_DIR/plugins"
 PLUGIN_CONF="$MYBASH_DIR/config/plugins.conf"
 if [[ ! -f "$PLUGIN_CONF" ]]; then
     echo "Error: Plugins config file not found at $PLUGIN_CONF."

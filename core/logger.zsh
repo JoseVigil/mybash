@@ -1,19 +1,24 @@
 #!/bin/zsh
+
 if [[ -n "$LOGGER_LOADED" ]]; then
     return 0
 fi
+
 export LOGGER_LOADED=1
 if [[ -z "$LOG_FILE" ]]; then
     echo "Warning: LOG_FILE not set by caller, using default /tmp/mybash.log"
     LOG_FILE="/tmp/mybash.log"
 fi
-log_message() {
+
+# Define log_message as a global function
+function log_message {
     local level="$1"
     local message="$2"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     echo "$timestamp [$level] - $message" >> "$LOG_FILE"
-    echo "$timestamp [$level] - $message"
 }
+export -f log_message
+
 initialize_log_file() {
     local log_dir="$(dirname "$LOG_FILE")"
     if [[ ! -d "$log_dir" ]]; then

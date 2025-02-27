@@ -3,6 +3,13 @@
     # ==============================
     # LOAD LOGGER 
     # ==============================
+
+    if [[ -f "$MYBASH_DIR/core/logger.zsh" ]]; then
+        source "$MYBASH_DIR/core/logger.zsh"
+    else
+        echo "Error: Logger file not found at $MYBASH_DIR/core/logger.zsh."
+        exit 1
+    fi
     
     # ==============================
     # LIST AND CHECK DEPENDENCIES
@@ -181,7 +188,7 @@
             return 1
         fi
 
-        local plugin_dir="$MYBASH_DIR/plugins/$plugin_name"
+        local plugin_dir="$PLUGINS_DIR/$plugin_name"
         if [[ -d "$plugin_dir" ]]; then
             echo "Error: Plugin '$plugin_name' already exists at $plugin_dir."
             return 1
@@ -189,76 +196,66 @@
 
         # Create plugin directory
         mkdir -p "$plugin_dir"
-        log_message "Created plugin directory: $plugin_dir"
+        # log_message "INFO" "Created plugin directory: $plugin_dir"
+        echo "Created plugin directory: $plugin_dir"
 
-        # Create main.zsh entry point
-        echo "#!/bin/zsh" > "$plugin_dir/main.zsh"
-        echo "" >> "$plugin_dir/main.zsh"
-        echo "# Load core logger and database helper" >> "$plugin_dir/main.zsh"
-        echo "source \"\$MYBASH_DIR/core/logger.zsh\"" >> "$plugin_dir/main.zsh"
-        echo "source \"\$MYBASH_DIR/db/dbhelper.zsh\"" >> "$plugin_dir/main.zsh"
-        echo "" >> "$plugin_dir/main.zsh"
-        echo "${plugin_name}_main() {" >> "$plugin_dir/main.zsh"
-        echo "    local subcommand=\"\$1\"" >> "$plugin_dir/main.zsh"
-        echo "    shift" >> "$plugin_dir/main.zsh"
-        echo "    log_event \"${plugin_name}\" \"Executing subcommand: \$subcommand with args: \$*\" \"INFO\"" >> "$plugin_dir/main.zsh"
-        echo "    case \"\$subcommand\" in" >> "$plugin_dir/main.zsh"
-        echo "        greet)" >> "$plugin_dir/main.zsh"
-        echo "            echo \"Hello from ${plugin_name}!\"" >> "$plugin_dir/main.zsh"
-        echo "            ;;" >> "$plugin_dir/main.zsh"
-        echo "        status)" >> "$plugin_dir/main.zsh"
-        echo "            echo \"${plugin_name} is active.\"" >> "$plugin_dir/main.zsh"
-        echo "            ;;" >> "$plugin_dir/main.zsh"
-        echo "        configure)" >> "$plugin_dir/main.zsh"
-        echo "            echo \"Configuring ${plugin_name} with args: \$*\"" >> "$plugin_dir/main.zsh"
-        echo "            ;;" >> "$plugin_dir/main.zsh"
-        echo "        *)" >> "$plugin_dir/main.zsh"
-        echo "            echo \"Unknown subcommand: \$subcommand\"" >> "$plugin_dir/main.zsh"
-        echo "            echo \"Supported: greet, status, configure\"" >> "$plugin_dir/main.zsh"
-        echo "            ;;" >> "$plugin_dir/main.zsh"
-        echo "    esac" >> "$plugin_dir/main.zsh"
-        echo "}" >> "$plugin_dir/main.zsh"
-        echo "" >> "$plugin_dir/main.zsh"
-        echo "# Execute main function with arguments" >> "$plugin_dir/main.zsh"
-        echo "${plugin_name}_main \"\$@\"" >> "$plugin_dir/main.zsh"
-        chmod +x "$plugin_dir/main.zsh"
-        log_message "Created main.zsh for plugin '$plugin_name'."
+        # Create main plugin script (e.g., notes.zsh)
+        local plugin_script="$plugin_dir/${plugin_name}.zsh"
+        echo "#!/bin/zsh" > "$plugin_script"
+        echo "" >> "$plugin_script"
+        echo "# Plugin: $plugin_name - Auto-generated plugin script" >> "$plugin_script"
+        echo "" >> "$plugin_script"
+        echo "# Load core dependencies" >> "$plugin_script"
+        echo "source \"\$MYBASH_DIR/core/logger.zsh\"" >> "$plugin_script"
+        echo "source \"\$MYBASH_DIR/db/dbhelper.zsh\"" >> "$plugin_script"
+        echo "" >> "$plugin_script"
+        echo "# Initialize plugin-specific database table (example)" >> "$plugin_script"
+        echo "${plugin_name}_init_db() {" >> "$plugin_script"
+        echo "    echo \"CREATE TABLE IF NOT EXISTS ${plugin_name} (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, text TEXT NOT NULL);\" | sqlite3 \"\$DB_FILE\"" >> "$plugin_script"
+        echo "    [[ \$? -eq 0 ]] && echo \"Initialized ${plugin_name} table in \$DB_FILE\" || {" >> "$plugin_script"
+        echo "        echo \"Error: Failed to initialize ${plugin_name} table.\"" >> "$plugin_script"
+        echo "        exit 1" >> "$plugin_script"
+        echo "    }" >> "$plugin_script"
+        echo "}" >> "$plugin_script"
+        echo "" >> "$plugin_script"
+        echo "${plugin_name}_main() {" >> "$plugin_script"
+        echo "    case \"\$1\" in" >> "$plugin_script"
+        echo "        init)" >> "$plugin_script"
+        echo "            ${plugin_name}_init_db" >> "$plugin_script"
+        echo "            ;;" >> "$plugin_script"
+        echo "        add)" >> "$plugin_script"
+        echo "            shift" >> "$plugin_script"
+        echo "            local timestamp=\$(date '+%Y-%m-%d %H:%M:%S')" >> "$plugin_script"
+        echo "            sqlite3 \"\$DB_FILE\" \"INSERT INTO ${plugin_name} (timestamp, text) VALUES ('\$timestamp', '\$*');\"" >> "$plugin_script"
+        echo "            echo \"Added: \$timestamp - \$*\"" >> "$plugin_script"
+        echo "            ;;" >> "$plugin_script"
+        echo "        list)" >> "$plugin_script"
+        echo "            sqlite3 \"\$DB_FILE\" \"SELECT timestamp, text FROM ${plugin_name};\" | while IFS='|' read -r timestamp text; do" >> "$plugin_script"
+        echo "                echo \"\$timestamp - \$text\"" >> "$plugin_script"
+        echo "            done" >> "$plugin_script"
+        echo "            ;;" >> "$plugin_script"
+        echo "        *)" >> "$plugin_script"
+        echo "            echo \"Usage: myb ${plugin_name} [init | add <text> | list]\"" >> "$plugin_script"
+        echo "            ;;" >> "$plugin_script"
+        echo "    esac" >> "$plugin_script"
+        echo "}" >> "$plugin_script"
+        echo "" >> "$plugin_script"
+        echo "# Export plugin commands" >> "$plugin_script"
+        echo "PLUGIN_COMMANDS[\"${plugin_name}.init\"]=\"${plugin_name}_main init\"" >> "$plugin_script"
+        echo "PLUGIN_COMMANDS[\"${plugin_name}.add\"]=\"${plugin_name}_main add\"" >> "$plugin_script"
+        echo "PLUGIN_COMMANDS[\"${plugin_name}.list\"]=\"${plugin_name}_main list\"" >> "$plugin_script"
+        chmod +x "$plugin_script"
+        # log_message "INFO" "Created ${plugin_name}.zsh for plugin '$plugin_name'."
+        echo "Created ${plugin_name}.zsh for plugin '$plugin_name'."
 
-        # Create plugin.conf with sections, including [repo]
+        # Create minimal plugin.conf
         echo "[general]" > "$plugin_dir/plugin.conf"
         echo "name=${plugin_name}" >> "$plugin_dir/plugin.conf"
-        echo "description=A powerful plugin to demonstrate extended configuration with commands." >> "$plugin_dir/plugin.conf"
-        echo "version=1.0.0" >> "$plugin_dir/plugin.conf"
-        echo "author=YourName" >> "$plugin_dir/plugin.conf"
-        echo "enabled=true" >> "$plugin_dir/plugin.conf"
-        echo "" >> "$plugin_dir/plugin.conf"
-        echo "[commands]" >> "$plugin_dir/plugin.conf"
-        echo "greet=echo \"Hello from ${plugin_name}!\"" >> "$plugin_dir/plugin.conf"
-        echo "status=${plugin_name}_status" >> "$plugin_dir/plugin.conf"
-        echo "configure=${plugin_name}_configure" >> "$plugin_dir/plugin.conf"
-        echo "" >> "$plugin_dir/plugin.conf"
-        echo "[drivers]" >> "$plugin_dir/plugin.conf"
-        echo "sqlite=enabled" >> "$plugin_dir/plugin.conf"
-        echo "" >> "$plugin_dir/plugin.conf"
-        echo "[database]" >> "$plugin_dir/plugin.conf"
-        echo "driver=sqlite" >> "$plugin_dir/plugin.conf"
-        echo "db_file=\${MYBASH_DIR}/db/mybash.db" >> "$plugin_dir/plugin.conf"
-        echo "" >> "$plugin_dir/plugin.conf"
-        echo "[settings]" >> "$plugin_dir/plugin.conf"
-        echo "log_level=info" >> "$plugin_dir/plugin.conf"
-        echo "timeout=30" >> "$plugin_dir/plugin.conf"
-        echo "auto_update=true" >> "$plugin_dir/plugin.conf"
-        echo "" >> "$plugin_dir/plugin.conf"
-        echo "[dependencies]" >> "$plugin_dir/plugin.conf"
-        echo "required_packages=sqlite3" >> "$plugin_dir/plugin.conf"
-        echo "optional_packages=" >> "$plugin_dir/plugin.conf"
-        echo "" >> "$plugin_dir/plugin.conf"
-        echo "[repo]" >> "$plugin_dir/plugin.conf"
-        echo "source=local" >> "$plugin_dir/plugin.conf"
-        echo "url=" >> "$plugin_dir/plugin.conf"  # Empty by default, to be filled if repo-based
-
-        log_message "Created plugin.conf for plugin '$plugin_name'."
+        echo "enabled=false" >> "$plugin_dir/plugin.conf"
+        # log_message "INFO" "Created minimal plugin.conf for plugin '$plugin_name'."
+        echo "Created minimal plugin.conf for plugin '$plugin_name'."
         echo "Plugin '$plugin_name' created successfully at $plugin_dir."
+        echo "Next steps: Configure $plugin_dir/plugin.conf and run 'myb install-plugin $plugin_name' to enable."
     }
 
     show_create_plugin_help() {
