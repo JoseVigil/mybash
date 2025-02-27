@@ -16,6 +16,10 @@ venv/
 .env
 *.log
 
-# Archivos del sistema
+# System Files
 .DS_Store
 Thumbs.db
+
+# Ignore Plugins
+/plugins/*
+!/plugins/README.md
