@@ -8,27 +8,30 @@ def get_metadata(command_name, args):
     Captures metadata about the current environment and process.
     :param command_name: Name of the command being executed.
     :param args: Arguments passed to the command.
-    :return: A dictionary containing metadata.
+    :return: A formatted string containing metadata in a user-friendly way.
     """
     # Get environment variables (filtering for MYBASH-related variables)
     env_vars = {k: v for k, v in os.environ.items() if k.startswith("MYBASH_")}
-
+    
     # Get current process information
     current_process = psutil.Process(os.getpid())
     process_info = {
-        "pid": current_process.pid,
-        "name": current_process.name(),
-        "cmdline": current_process.cmdline(),
+        "PID": current_process.pid,
+        "Process Name": current_process.name(),
+        "Command Line": " ".join(current_process.cmdline()),
     }
 
-    # Combine all metadata
-    metadata = {
-        "command_name": command_name,
-        "args": args,
-        "env_vars": env_vars,
-        "process_info": process_info,
-    }
-    return str(metadata)
+    # Build a readable metadata string
+    metadata = f"Command Name: {command_name}\n"
+    metadata += f"Arguments: {' '.join(args)}\n\n"
+    metadata += "Environment Variables:\n"
+    for key, value in env_vars.items():
+        metadata += f"  {key}: {value}\n"
+    metadata += "\nProcess Information:\n"
+    for key, value in process_info.items():
+        metadata += f"  {key}: {value}\n"
+
+    return metadata
 
 if __name__ == "__main__":
     # Parse arguments from the command line

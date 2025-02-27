@@ -1,95 +1,102 @@
-# Utility functions
-cpwd() {
-    pwd | pbcopy
-    echo "Copied current path to clipboard: $(pwd)"
-}
+#!/bin/zsh
 
-largefiles() {
-    local count=${1:-10}
-    find . -type f -exec du -h {} + | sort -rh | head -n "$count"
-}
+    source "$MYBASH_DIR/global.zsh"
+    source "$MYBASH_DIR/core/logger.zsh"
 
-opendir() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        open .
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        xdg-open .
-    else
-        echo "File explorer utility not supported on this OS."
-        return 1
-    fi
-}
+    cpwd() {
+        log_event "cpwd" "Copying current path to clipboard" "INFO"
+        pwd | pbcopy
+        echo "Copied current path to clipboard: $(pwd)"
+    }
 
-mkcd() {
-    mkdir -p "$1" && cd "$1"
-}
+    largefiles() {
+        local count=${1:-10}
+        log_event "largefiles" "Listing $count largest files" "INFO"
+        find . -type f -exec du -h {} + | sort -rh | head -n "$count"
+    }
 
-myip() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        local wifi_interface=$(networksetup -listallhardwareports | awk '/Wi-Fi/{getline; print $2}')
-        if [[ -z "$wifi_interface" ]]; then
-            echo "Wi-Fi interface not found."
+    opendir() {
+        log_event "opendir" "Opening directory explorer" "INFO"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            open .
+        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            xdg-open .
+        else
+            log_event "opendir" "Unsupported OS" "ERROR"
+            echo "File explorer utility not supported on this OS."
             return 1
         fi
-        local ip_address=$(ifconfig "$wifi_interface" | awk '/inet /{print $2}')
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        local ip_address=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d '/' -f 1)
-    else
-        echo "IP address utility not supported on this OS."
-        return 1
-    fi
+    }
 
-    if [[ -z "$ip_address" ]]; then
-        echo "No IP address found."
-        return 1
-    fi
-    echo "IP Address: $ip_address"
-}
+    mkcd() {
+        log_event "mkcd" "Creating and entering directory $1" "INFO"
+        mkdir -p "$1" && cd "$1"
+    }
 
-# Load a file into memory
-load_file() {
-    local file="$1"
-    if [[ -z "$file" ]]; then
-        echo "Usage: load_file <file>"
-        return 1
-    fi
+    myip() {
+        log_event "myip" "Retrieving IP address" "INFO"
+        if [[ "$OSTYPE" == "darwin"* ]]; then
+            local wifi_interface=$(networksetup -listallhardwareports | awk '/Wi-Fi/{getline; print $2}')
+            if [[ -z "$wifi_interface" ]]; then
+                log_event "myip" "Wi-Fi interface not found" "ERROR"
+                echo "Wi-Fi interface not found."
+                return 1
+            fi
+            local ip_address=$(ifconfig "$wifi_interface" | awk '/inet /{print $2}')
+        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            local ip_address=$(ip addr show | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' | cut -d '/' -f 1)
+        else
+            log_event "myip" "Unsupported OS" "ERROR"
+            echo "IP address utility not supported on this OS."
+            return 1
+        fi
+        if [[ -z "$ip_address" ]]; then
+            log_event "myip" "No IP address found" "ERROR"
+            echo "No IP address found."
+            return 1
+        fi
+        echo "IP Address: $ip_address"
+    }
 
-    if [[ ! -f "$file" ]]; then
-        echo "Error: File '$file' not found."
-        return 1
-    fi
+    load_file() {
+        local file="$1"
+        if [[ -z "$file" ]]; then
+            log_event "load_file" "No file provided" "ERROR"
+            echo "Usage: load_file <file>"
+            return 1
+        fi
+        if [[ ! -f "$file" ]]; then
+            log_event "load_file" "File '$file' not found" "ERROR"
+            echo "Error: File '$file' not found."
+            return 1
+        fi
+        log_event "load_file" "Loading file $file" "INFO"
+        cat "$file"
+    }
 
-    echo "Loading file: $file"
-    cat "$file"
-}
+    extract_functions_from_file() {
+        local file="$1"
+        if [[ ! -f "$file" ]]; then
+            log_event "extract_functions_from_file" "File '$file' not found" "ERROR"
+            echo "Error: Archivo no encontrado: $file"
+            return 1
+        fi
+        log_event "extract_functions_from_file" "Extracting functions from $file" "INFO"
+        grep -E '^\s*(function\s+[a-zA-Z_][a-zA-Z0-9_]*|[a-zA-Z_][a-zA-Z0-9_]*\(\))' "$file" | sed -E 's/\(\)\s*\{//' | sed -E 's/function //'
+    }
 
-# Backup command
-mybash_backup() {
-    BACKUP_DIR="$MYBASH_DATA_DIR/backup"
-    TIMESTAMP=$(date '+%Y%m%d%H%M%S')
-    BACKUP_PATH="$BACKUP_DIR/mybash-backup-$TIMESTAMP"
-
-    # Ensure the backup directory exists
-    mkdir -p "$BACKUP_PATH"
-
-    # Copy the entire mybash repository to the backup location
-    echo "Creating backup of $MYBASH_DIR in $BACKUP_PATH..."
-    cp -r "$MYBASH_DIR"/* "$BACKUP_PATH"
-
-    # Log the backup creation
-    if [[ -d "$BACKUP_PATH" ]]; then
-        echo "Backup created successfully: $BACKUP_PATH"
-        log_message "Backup created successfully: $BACKUP_PATH"
-    else
-        echo "Error: Backup failed."
-        log_message "Error: Backup failed."
-        return 1
-    fi
-}
-
-# Function to clean old backups
-function mybash_clean_backups() {
-    BACKUP_DIR="$HOME/Documents/mybash/backup"
-    find "$BACKUP_DIR" -type d -mtime +7 -exec rm -rf {} \;
-    echo "Old backups deleted from $BACKUP_DIR."
-}
+    extract_functions_from_dir() {
+        local dir="$1"
+        if [[ ! -d "$dir" ]]; then
+            log_event "extract_functions_from_dir" "Directory '$dir' not found" "ERROR"
+            echo "Error: Directorio no encontrado: $dir"
+            return 1
+        fi
+        log_event "extract_functions_from_dir" "Extracting functions from directory $dir" "INFO"
+        for file in "$dir"/*.sh "$dir"/*.zsh; do
+            [[ -f "$file" ]] || continue
+            echo "Archivo: $file"
+            extract_functions_from_file "$file"
+            echo "---------------------------------"
+        done
+    }

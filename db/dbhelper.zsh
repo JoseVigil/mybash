@@ -1,64 +1,78 @@
-# Database Helper Functions
+#!/bin/zsh
 
-# Initialize the database
-init_db() {
-    local db_file="$MYBASH_DIR/db/mybash.db"
-    if [[ ! -f "$db_file" ]]; then
-        echo "Initializing database: $db_file"
-        sqlite3 "$db_file" <<EOF
-CREATE TABLE IF NOT EXISTS general_info (
-    key TEXT PRIMARY KEY,
-    value TEXT
-);
-EOF
-    else
-        echo "Database already exists: $db_file"
-    fi
-}
+    # ==============================
+    # GLOBAL VARIABLES
+    # ==============================
 
-# Add or update a key-value pair in the database
-db_set() {
-    local key="$1"
-    local value="$2"
-    local db_file="$MYBASH_DIR/db/mybash.db"
+    # Load Global Variables
+    source "$MYBASH_DIR/global.zsh"
 
-    if [[ -z "$key" || -z "$value" ]]; then
-        echo "Usage: db_set <key> <value>"
-        return 1
-    fi
+    # ==============================
+    # DATABASE HELPER FUNCTIONS
+    # ==============================      
 
-    sqlite3 "$db_file" "INSERT OR REPLACE INTO general_info (key, value) VALUES ('$key', '$value');"
-    echo "Set '$key' = '$value'"
-}
+    # Save a command to the database
+    save_command() {
+        local name="$1"
+        local description="$2"
+        local usage="$3"
+        local db_file="$MYBASH_DIR/db/mybash.db"
+        if [[ -z "$name" || -z "$description" || -z "$usage" ]]; then
+            echo "Usage: save_command <name> <description> <usage>"
+            return 1
+        fi
+        sqlite3 "$db_file" "INSERT INTO commands (name, description, usage) VALUES ('$name', '$description', '$usage');"
+        echo "Command '$name' saved successfully."
+    }
 
-# Get the value of a key from the database
-db_get() {
-    local key="$1"
-    local db_file="$MYBASH_DIR/db/mybash.db"
+    # List all commands from the database
+    list_commands() {
+        local db_file="$MYBASH_DIR/db/mybash.db"
+        echo "Available commands:"
+        sqlite3 "$db_file" "SELECT name, description FROM commands;" | while read -r line; do
+            echo "- $line"
+        done
+    }
 
-    if [[ -z "$key" ]]; then
-        echo "Usage: db_get <key>"
-        return 1
-    fi
+    # Save a bookmark to the database
+    save_bookmark() {
+        local name="$1"
+        local path="$2"
+        local db_file="$MYBASH_DIR/db/mybash.db"
+        if [[ -z "$name" || -z "$path" ]]; then
+            echo "Usage: save_bookmark <name> <path>"
+            return 1
+        fi
+        sqlite3 "$db_file" "INSERT INTO bookmarks (name, path) VALUES ('$name', '$path');"
+        echo "Bookmark '$name' saved successfully."
+    }
 
-    local value=$(sqlite3 "$db_file" "SELECT value FROM general_info WHERE key = '$key';")
-    if [[ -z "$value" ]]; then
-        echo "Key '$key' not found in the database."
-    else
-        echo "$value"
-    fi
-}
+    # List all bookmarks from the database
+    list_bookmarks() {
+        local db_file="$MYBASH_DIR/db/mybash.db"
+        echo "Available bookmarks:"
+        sqlite3 "$db_file" "SELECT name, path FROM bookmarks;" | while read -r line; do
+            echo "- $line"
+        done
+    }
 
-# Delete a key from the database
-db_delete() {
-    local key="$1"
-    local db_file="$MYBASH_DIR/db/mybash.db"
+    # Save a command to the history
+    save_history() {
+        local command="$1"
+        local db_file="$MYBASH_DIR/db/mybash.db"
+        if [[ -z "$command" ]]; then
+            echo "Usage: save_history <command>"
+            return 1
+        fi
+        sqlite3 "$db_file" "INSERT INTO history (command) VALUES ('$command');"
+        echo "Command '$command' added to history."
+    }
 
-    if [[ -z "$key" ]]; then
-        echo "Usage: db_delete <key>"
-        return 1
-    fi
-
-    sqlite3 "$db_file" "DELETE FROM general_info WHERE key = '$key';"
-    echo "Deleted key '$key'"
-}
+    # View command history
+    view_history() {
+        local db_file="$MYBASH_DIR/db/mybash.db"
+        echo "Command history:"
+        sqlite3 "$db_file" "SELECT command, executed_at FROM history ORDER BY executed_at DESC;" | while read -r line; do
+            echo "- $line"
+        done
+    }
