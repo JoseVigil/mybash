@@ -1,59 +1,30 @@
 #!/bin/zsh
 
-echo "TRACE: Starting main.zsh with args: $@"
-
-# ==============================
-# VERIFY ZSH ENVIRONMENT
-# ==============================
-echo "TRACE: Checking ZSH_VERSION"
 if [[ -z "$ZSH_VERSION" ]]; then
     echo "Error: mybash requires Zsh. Please run this script using Zsh."
     exit 1
 fi
 
-echo "TRACE: Loading compinit"
 autoload -Uz compinit
 compinit
 
-echo "TRACE: Checking compdef"
-if ! type compdef &>/dev/null; then
-    echo "Warning: 'compdef' is not available. Autocompletion will not work."
-fi
-
-# ==============================
-# AVOID MULTIPLE LOAD
-# ==============================
-echo "TRACE: Checking MYBASH_MAIN_LOADED"
 if [[ -o interactive && -n "$MYBASH_MAIN_LOADED" ]]; then
-    echo "TRACE: Main already loaded in interactive session, returning"
     return
 fi
-echo "TRACE: Setting MYBASH_MAIN_LOADED"
 export MYBASH_MAIN_LOADED=true
 
-# ==============================
-# LOAD PATH FROM path.conf
-# ==============================
 load_path_from_conf() {
     local path_conf="/opt/mybash/path.conf"
-    echo "TRACE: Checking path.conf at $path_conf"
     if [[ -f "$path_conf" ]]; then
         MYBASH_DIR=$(grep '^MYBASH_DIR=' "$path_conf" | cut -d'=' -f2)
         export MYBASH_DIR
-        echo "Mybash running from: $MYBASH_DIR"
     else
         MYBASH_DIR="$(cd "$(dirname "$0")" && pwd)"
         export MYBASH_DIR
-        echo "Warning: path.conf not found at $path_conf. Using fallback: $MYBASH_DIR"
     fi
 }
-echo "TRACE: Calling load_path_from_conf"
 load_path_from_conf  
 
-# ==============================
-# LOAD GLOBAL VARIABLES
-# ==============================
-echo "TRACE: Loading global.zsh"
 if [[ -f "$MYBASH_DIR/global.zsh" ]]; then
     source "$MYBASH_DIR/global.zsh"
 else
@@ -61,35 +32,38 @@ else
     exit 1
 fi
 
-# ==============================
-# LOAD LOGGER
-# ==============================
-echo "TRACE: Loading logger.zsh"
-if [[ -f "$MYBASH_DIR/core/logger.zsh" ]]; then
-    source "$MYBASH_DIR/core/logger.zsh"
-else
-    echo "Error: Logger file not found at $MYBASH_DIR/core/logger.zsh."
-    exit 1
-fi     
+typeset -A -g PLUGIN_COMMANDS
 
-# ==============================
-# LOAD CORE SCRIPTS
-# ==============================
-echo "TRACE: Loading loader.zsh"
+core_scripts=(
+    "bkm.zsh"
+    "cmd.zsh"
+    "completion.zsh"
+    "env.zsh"
+    "func.zsh"
+    "logger.zsh"
+    "selfcheck.zsh"
+)
+for script in "${core_scripts[@]}"; do
+    script_path="$MYBASH_DIR/core/$script"
+    if [[ -f "$script_path" ]]; then
+        source "$script_path" >/dev/null 2>&1
+        if [[ $? -ne 0 ]]; then
+            echo "Error: Failed to source $script_path"
+            exit 1
+        fi
+    else
+        echo "Warning: Core script $script_path not found."
+    fi
+done
+
 if [[ -f "$MYBASH_DIR/core/loader.zsh" ]]; then
-    source "$MYBASH_DIR/core/loader.zsh"
-    echo "TRACE: Running load_core_scripts"
-    load_core_scripts
-    echo "TRACE: Running load_plugins"
+    source "$MYBASH_DIR/core/loader.zsh" >/dev/null 2>&1
     load_plugins
 else
     echo "Error: Loader script 'loader.zsh' not found."
     exit 1
 fi
 
-# ==============================
-# RUN TEST
-# ==============================
 run_tests() {
     TEST_SCRIPT="$MYBASH_DIR/utils/test.zsh"
     if [[ -f "$TEST_SCRIPT" ]]; then
@@ -102,9 +76,6 @@ run_tests() {
     fi
 }
 
-# ==============================
-# COMMAND HANDLERS
-# ==============================
 execute_cmd_main() {
     if declare -F cmd_main &>/dev/null; then
         log_event "Executing cmd_main with arguments: $*"
@@ -127,9 +98,6 @@ execute_bkm_main() {
     fi
 }
 
-# ==============================
-# INTERACTIVE SHELL
-# ==============================
 interactive_shell() {
     echo "Entering MyBash interactive shell. Type 'exit' to quit."
     export MYB_CURRENT_MODULE=""
@@ -170,13 +138,10 @@ interactive_shell() {
     echo "Exiting interactive shell."
 }
 
-# ==============================
-# PYTHON ENTRY POINT
-# ==============================
 execute_mypy() {
     if [[ -f "$MYBASH_DIR/tools/mypy.zsh" ]]; then
         log_event "mypy" "Executing mypy with arguments: $*" "INFO"
-        source "$MYBASH_DIR/tools/mypy.zsh"
+        source "$MYBASH_DIR/tools/mypy.zsh" >/dev/null 2>&1
         mypy "$@"
     else
         log_event "mypy" "Error: mypy.zsh not found at $MYBASH_DIR/tools/mypy.zsh" "ERROR"
@@ -184,123 +149,92 @@ execute_mypy() {
         exit 1
     fi
 }
-   
-# ==============================
-# MAIN LOGIC
-# ==============================
-echo "TRACE: Processing command: $1"
-case "$1" in
-    test)
-        run_tests "$@"
-        ;;
-    help)
+
+dependencies_main() {
+    case "$1" in
+        check) list_dependencies ;;
+        install) install_dependencies ;;
+        *) show_dependencies_help ;;
+    esac
+}
+
+env_main() {
+    case "$1" in
+        create) env_create "$2" ;;
+        activate) env_activate "$2" ;;
+        list) env_list ;;
+        delete) env_delete "$2" ;;
+        *) show_env_help ;;
+    esac
+}
+
+conda_main() {
+    case "$1" in
+        create) conda_create "$2" ;;
+        activate) conda_activate "$2" ;;
+        list) conda_list ;;
+        delete) conda_delete "$2" ;;
+        *) show_conda_help ;;
+    esac
+}
+
+show_help() {
+    echo "Usage: mybash [command]"
+    echo "Available commands:"
+    echo "  help             Show this help message."
+    echo "  env              Manage virtual environments (create, activate, list, delete)."
+    echo "  conda            Manage Conda environments (create, activate, list, delete)."
+    echo "  backup           Create a backup of the mybash project."
+    echo "  dependencies     Install or check required dependencies."
+    echo "  symlinks         Create symbolic links for mybash commands."
+    echo "  zshrc            Add main.zsh to ~/.zshrc."
+    echo "  data             Create necessary data directories."
+    echo "  test             Run automated tests."
+    echo "  cmd              Execute custom commands."
+    echo "  bkm              Execute bookmark-related commands."
+    echo "  plugin           Manage plugins (clone, create, install, uninstall)."
+    if [[ -n "${(k)PLUGIN_COMMANDS}" ]]; then
+        echo "  Plugin commands:"
+        for key in ${(k)PLUGIN_COMMANDS}; do
+            echo "    ${key%%.*} ${key#*.}    Run ${PLUGIN_COMMANDS[$key]}"
+        done
+    fi
+}
+
+unknown_command() {
+    if [[ -z "$1" ]]; then
+        return 0
+    else
+        echo "Unknown command: $1"
         show_help
-        ;;
-    mypy)
-        execute_mypy "${@:2}"
-        ;;
-    help-ext)
-        show_ext_help
-        ;;
-    backup)
-        create_backup
-        ;;
-    uninstall)
-        uninstall
-        ;;
-    dependencies)
-        case "$2" in
-            check)
-                list_dependencies
-                ;;
-            install)
-                install_dependencies
-                ;;
-            *)
-                show_dependencies_help
-                ;;
-        esac
-        ;;
-    symlinks)
-        create_symlinks
-        ;;
-    zshrc)
-        add_to_zshrc
-        ;;
-    data)
-        create_data_directories
-        ;;
-    test)
-        run_tests
-        ;;
-    cmd)
-        execute_cmd_main "$@"
-        ;;
-    bkm)
-        execute_bkm_main "$@"
-        ;;
-    env)
-        case "$2" in
-            create)
-                env_create "$3"
-                ;;
-            activate)
-                env_activate "$3"
-                ;;
-            list)
-                env_list
-                ;;
-            delete)
-                env_delete "$3"
-                ;;
-            *)
-                show_env_help
-                ;;
-        esac
-        ;;
-    conda)
-        case "$2" in
-            create)
-                conda_create "$3"
-                ;;
-            activate)
-                conda_activate "$3"
-                ;;
-            list)
-                conda_list
-                ;;
-            delete)
-                conda_delete "$3"
-                ;;
-            *)
-                show_conda_help
-                ;;
-        esac
-        ;;
-    create-plugin)
-        if [[ -z "$2" ]]; then
-            echo "Error: Plugin name is required."
-            show_create_plugin_help
-            exit 1
-        fi
-        create_plugin "$2"
-        ;;
-    install-plugin)
-        if [[ -z "$2" ]]; then
-            echo "Error: Plugin name is required."
-            show_install_plugin_help
-            exit 1
-        fi
-        install_plugin "$2"
-        ;;
-    *)
-        if [[ -z "$1" ]]; then
-            return 0
-        else
-            echo "Unknown command: $1"
-            show_help
-            exit 1
-        fi
-        ;;
+        exit 1
+    fi
+}
+ 
+if [[ $# -ge 2 ]]; then
+    local cmd_key="$1.$2"
+    if [[ -n "${PLUGIN_COMMANDS[$cmd_key]}" ]]; then
+        eval "${PLUGIN_COMMANDS[$cmd_key]}" "${@:3}"
+        exit 0
+    fi
+fi
+
+case "$1" in
+    test) run_tests "$@" ;;
+    help) show_help ;;
+    mypy) execute_mypy "${@:2}" ;;
+    help-ext) show_ext_help ;;
+    backup) create_backup ;;
+    uninstall) uninstall ;;
+    dependencies) dependencies_main "${@:2}" ;;
+    symlinks) create_symlinks ;;
+    zshrc) add_to_zshrc ;;
+    data) create_data_directories ;;
+    cmd) execute_cmd_main "$@" ;;
+    bkm) execute_bkm_main "$@" ;;
+    env) env_main "${@:2}" ;;
+    conda) conda_main "${@:2}" ;;
+    plugin) 
+        plugin_main "${@:2}" ;;
+    *) unknown_command "$1" ;;
 esac
-echo "TRACE: Command execution completed"

@@ -10,12 +10,14 @@ if [[ -z "$LOG_FILE" ]]; then
     LOG_FILE="/tmp/mybash.log"
 fi
 
-# Define log_message as a global function
+# Define and export log_message globally
 function log_message {
     local level="$1"
     local message="$2"
     local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    echo "$timestamp [$level] - $message" >> "$LOG_FILE"
+    [[ -z "$LOG_FILE" ]] && LOG_FILE="$MYBASH_DIR/logs/mybash.log"
+    mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null
+    echo "$timestamp [$level] - $message" >> "$LOG_FILE" 2>/dev/null
 }
 export -f log_message
 

@@ -1,5 +1,7 @@
 -- $MYBASH_DIR/config/schema.sql
 
+-- $MYBASH_DIR/config/schema.sql
+
 CREATE TABLE IF NOT EXISTS config (
     key TEXT PRIMARY KEY,
     value TEXT
@@ -18,17 +20,6 @@ CREATE TABLE IF NOT EXISTS commands (
     description TEXT,
     usage TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE IF NOT EXISTS todo_notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',  -- 'pending', 'completed'
-    priority INTEGER DEFAULT 0,     -- 0 low, 1 medium, 2 high
-    due_date TIMESTAMP,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS history (
