@@ -139,6 +139,28 @@ mybash --help
 
 ---
 
+### Optional Dependencies
+
+#### Tmuxinator
+Tmuxinator is an optional tool for managing tmux sessions with predefined layouts. Due to its complex dependencies (e.g., Ruby >= 2.6.7), it must be installed manually:
+
+1. **Install RVM (Ruby Version Manager)**:
+   ```bash
+   curl -sSL https://get.rvm.io | bash -s stable
+   source ~/.rvm/scripts/rvm
+   
+   rvm install 3.2.2  # Or any version >= 2.6.7
+   rvm use 3.2.2 --default
+
+   gem install tmuxinator -v 3.3.3
+
+   tmuxinator version  # Should show 3.3.3
+   ```
+
+---
+
+---
+
 ## � Plugins
 
 ### Sticky Notes Plugin

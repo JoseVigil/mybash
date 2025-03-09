@@ -6,8 +6,21 @@
 
     if [[ -f "$MYBASH_DIR/core/logger.zsh" ]]; then
         source "$MYBASH_DIR/core/logger.zsh"
+        if ! typeset -f log_message > /dev/null; then
+            echo "Error: log_message not defined after sourcing $MYBASH_DIR/core/logger.zsh at script start."
+            exit 1
+        else
+            echo "Debug: log_message defined at script start."
+        fi
     else
         echo "Error: Logger file not found at $MYBASH_DIR/core/logger.zsh."
+        exit 1
+    fi
+
+    if [[ -f "$MYBASH_DIR/db/dbhelper.zsh" ]]; then
+        source "$MYBASH_DIR/db/dbhelper.zsh"
+    else
+        echo "Error: DBHelper file not found at $MYBASH_DIR/db/dbhelper.zsh."
         exit 1
     fi
     
@@ -186,42 +199,19 @@
     # ==============================
 
     plugin_main() {
-        echo "Inside plugin_main with args: $@"  # Depuración básica
+        echo "Inside plugin_main with args: $@"  # Debugging
         local action="$1"
         local plugin_name="$2"
-        local arg3="$3"
-        local arg4="$4"
+        shift 2
+        local args="$@"
+
+        # Verify log_message is available (loaded by main.zsh)
+        if ! typeset -f log_message > /dev/null; then
+            echo "Error: log_message function not available. Check loading order in main.zsh."
+            exit 1
+        fi
 
         case "$action" in
-            clone)
-                if [[ -z "$plugin_name" || -z "$arg3" ]]; then
-                    echo "Error: Plugin name and repository URL are required."
-                    echo "Usage: myb plugin clone <plugin_name> <repo_url> [--install]"
-                    return 1
-                fi
-
-                local plugin_dir="$PLUGINS_DIR/$plugin_name"
-                if [[ -d "$plugin_dir" ]]; then
-                    echo "Error: Plugin '$plugin_name' already exists at $plugin_dir."
-                    return 1
-                fi
-
-                echo "Cloning plugin '$plugin_name' from $arg3..."
-                git clone "$arg3" "$plugin_dir"
-                if [[ $? -ne 0 ]]; then
-                    echo "Error: Failed to clone repository from $arg3."
-                    return 1
-                fi
-
-                log_message "INFO" "Cloned plugin '$plugin_name' from $arg3 to $plugin_dir."
-                echo "Plugin '$plugin_name' cloned successfully to $plugin_dir."
-
-                if [[ "$arg4" == "--install" ]]; then
-                    plugin_main "install" "$plugin_name"
-                else
-                    echo "Next step: Run 'myb plugin install $plugin_name' to enable."
-                fi
-                ;;
             create)
                 if [[ -z "$plugin_name" ]]; then
                     echo "Error: Plugin name is required."
@@ -229,7 +219,7 @@
                     return 1
                 fi
 
-                local plugin_dir="$PLUGINS_DIR/$plugin_name"
+                local plugin_dir="$MYBASH_DIR/plugins/$plugin_name"  # Crear en $MYBASH_DIR/plugins
                 if [[ -d "$plugin_dir" ]]; then
                     echo "Error: Plugin '$plugin_name' already exists at $plugin_dir."
                     return 1
@@ -239,7 +229,8 @@
                 log_message "INFO" "Created plugin directory: $plugin_dir"
                 echo "Created plugin directory: $plugin_dir"
 
-                local plugin_script="$plugin_dir/${plugin_name}.zsh"
+                # Crear main.zsh básico
+                local plugin_script="$plugin_dir/main.zsh"
                 echo "#!/bin/zsh" > "$plugin_script"
                 echo "" >> "$plugin_script"
                 echo "# Plugin: $plugin_name - Auto-generated plugin script" >> "$plugin_script"
@@ -247,142 +238,160 @@
                 echo "# Load core dependencies" >> "$plugin_script"
                 echo "source \"\$MYBASH_DIR/core/logger.zsh\"" >> "$plugin_script"
                 echo "source \"\$MYBASH_DIR/db/dbhelper.zsh\"" >> "$plugin_script"
-                echo "[[ -z \"\$DB_FILE\" ]] && DB_FILE=\"\$MYBASH_DIR/db/mybash.db\"" >> "$plugin_script"
-                echo "" >> "$plugin_script"
-                echo "# Initialize plugin-specific database table" >> "$plugin_script"
-                echo "${plugin_name}_init_db() {" >> "$plugin_script"
-                echo "    echo \"CREATE TABLE IF NOT EXISTS ${plugin_name} (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL, text TEXT NOT NULL);\" | sqlite3 \"\$DB_FILE\"" >> "$plugin_script"
-                echo "    [[ \$? -eq 0 ]] && log_message \"INFO\" \"Initialized ${plugin_name} table in \$DB_FILE\" || {" >> "$plugin_script"
-                echo "        log_message \"ERROR\" \"Failed to initialize ${plugin_name} table.\"" >> "$plugin_script"
-                echo "        echo \"Error: Failed to initialize ${plugin_name} table.\"" >> "$plugin_script"
-                echo "        exit 1" >> "$plugin_script"
-                echo "    }" >> "$plugin_script"
-                echo "}" >> "$plugin_script"
                 echo "" >> "$plugin_script"
                 echo "${plugin_name}_main() {" >> "$plugin_script"
                 echo "    case \"\$1\" in" >> "$plugin_script"
-                echo "        init)" >> "$plugin_script"
-                echo "            ${plugin_name}_init_db" >> "$plugin_script"
-                echo "            ;;" >> "$plugin_script"
-                echo "        add)" >> "$plugin_script"
-                echo "            shift" >> "$plugin_script"
-                echo "            local timestamp=\$(date '+%Y-%m-%d %H:%M:%S')" >> "$plugin_script"
-                echo "            sqlite3 \"\$DB_FILE\" \"INSERT INTO ${plugin_name} (timestamp, text) VALUES ('\$timestamp', '\$*');\"" >> "$plugin_script"
-                echo "            log_message \"INFO\" \"Added ${plugin_name} entry: \$timestamp - \$*\"" >> "$plugin_script"
-                echo "            echo \"Added: \$timestamp - \$*\"" >> "$plugin_script"
-                echo "            ;;" >> "$plugin_script"
-                echo "        list)" >> "$plugin_script"
-                echo "            sqlite3 \"\$DB_FILE\" \"SELECT timestamp, text FROM ${plugin_name};\" | while IFS='|' read -r timestamp text; do" >> "$plugin_script"
-                echo "                echo \"\$timestamp - \$text\"" >> "$plugin_script"
-                echo "            done" >> "$plugin_script"
-                echo "            ;;" >> "$plugin_script"
                 echo "        *)" >> "$plugin_script"
-                echo "            echo \"Usage: myb ${plugin_name} [init | add <text> | list]\"" >> "$plugin_script"
+                echo "            echo \"Usage: myb $plugin_name [...]\"" >> "$plugin_script"
                 echo "            ;;" >> "$plugin_script"
                 echo "    esac" >> "$plugin_script"
                 echo "}" >> "$plugin_script"
                 echo "" >> "$plugin_script"
                 echo "# Export plugin commands" >> "$plugin_script"
-                echo "PLUGIN_COMMANDS[\"${plugin_name}.init\"]=\"${plugin_name}_main init\"" >> "$plugin_script"
-                echo "PLUGIN_COMMANDS[\"${plugin_name}.add\"]=\"${plugin_name}_main add\"" >> "$plugin_script"
-                echo "PLUGIN_COMMANDS[\"${plugin_name}.list\"]=\"${plugin_name}_main list\"" >> "$plugin_script"
                 chmod +x "$plugin_script"
-                log_message "INFO" "Created ${plugin_name}.zsh for plugin '$plugin_name'."
-                echo "Created ${plugin_name}.zsh for plugin '$plugin_name'."
+                log_message "INFO" "Created main.zsh for plugin '$plugin_name'."
+                echo "Created main.zsh for plugin '$plugin_name'."
 
-                echo "[general]" > "$plugin_dir/plugin.conf"
-                echo "name=${plugin_name}" >> "$plugin_dir/plugin.conf"
-                echo "enabled=false" >> "$plugin_dir/plugin.conf"
-                log_message "INFO" "Created minimal plugin.conf for plugin '$plugin_name'."
-                echo "Created minimal plugin.conf for plugin '$plugin_name'."
+                # Crear plugin.conf completo
+                local config_file="$plugin_dir/plugin.conf"
+                echo "[general]" > "$config_file"
+                echo "name=$plugin_name" >> "$config_file"
+                echo "title=$plugin_name Plugin" >> "$config_file"
+                echo "description=Description for $plugin_name" >> "$config_file"
+                echo "author=$USER" >> "$config_file"
+                echo "link=" >> "$config_file"
+                echo "[repository]" >> "$config_file"
+                echo "url=" >> "$config_file"
+                echo "[database]" >> "$config_file"
+                echo "datadb=" >> "$config_file"
+                echo "[log]" >> "$config_file"
+                echo "logfile=$MYBASH_DATA_HOME_DIR/plugins/$plugin_name/${plugin_name}.log" >> "$config_file"
+                log_message "INFO" "Created plugin.conf for plugin '$plugin_name'."
+                echo "Created plugin.conf for plugin '$plugin_name'."
+
                 echo "Plugin '$plugin_name' created successfully at $plugin_dir."
-
-                if [[ "$arg3" == "--init-repo" ]]; then
-                    cd "$plugin_dir"
-                    git init
-                    git add .
-                    git commit -m "Initial commit for $plugin_name plugin"
-                    echo "Initialized Git repository for '$plugin_name' at $plugin_dir."
-                    cd - > /dev/null
-                fi
-
-                if [[ "$arg3" == "--install" || "$arg4" == "--install" ]]; then
-                    plugin_main "install" "$plugin_name"
-                else
-                    echo "Next step: Run 'myb plugin install $plugin_name' to enable."
-                fi
+                echo "Next step: Edit $config_file and run 'myb plugin install $plugin_name' to install."
                 ;;
             install)
-                echo "Installing plugin: $plugin_name"  # Depuración básica
+                echo "Installing plugin: $plugin_name"
                 if [[ -z "$plugin_name" ]]; then
                     echo "Error: Plugin name is required."
                     show_install_plugin_help
                     return 1
                 fi
 
-                local plugin_dir="$PLUGINS_DIR/$plugin_name"
-                local config_file="$plugin_dir/plugin.conf"
-
-                if [[ ! -d "$plugin_dir" ]]; then
-                    echo "Error: Plugin '$plugin_name' not found in $PLUGINS_DIR."
+                local source_dir="$MYBASH_DIR/plugins/$plugin_name"
+                if [[ ! -d "$source_dir" ]]; then
+                    echo "Error: Plugin '$plugin_name' not found in $MYBASH_DIR/plugins."
                     return 1
                 fi
 
+                local config_file="$source_dir/plugin.conf"
                 if [[ ! -f "$config_file" ]]; then
                     echo "Error: Missing plugin.conf for '$plugin_name'."
                     return 1
                 fi
 
-                mkdir -p "$MYBASH_DIR/config"
+                local dest_dir="$MYBASH_DATA_DIR/plugins/$plugin_name"
+                local data_dir="$dest_dir/data"
+                local fonts_dir="$dest_dir/fonts"
+                local log_dir="$dest_dir/log"
+                mkdir -p "$data_dir" "$fonts_dir" "$log_dir" || {
+                    log_message "ERROR" "Failed to create directories at $dest_dir"
+                    echo "Error: Failed to create plugin directories."
+                    return 1
+                }
+                chmod -R 755 "$dest_dir"
+                chown -R "$USER":staff "$dest_dir"
+
+                # Read and expand plugin.conf
+                local expanded_config=$(envsubst < "$config_file")
+                local datadb=$(echo "$expanded_config" | awk -F'=' '/^\[database\]/{flag=1; next} flag&&/^datadb=/{print $2; exit}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                local logfile=$(echo "$expanded_config" | awk -F'=' '/^\[log\]/{flag=1; next} flag&&/^logfile=/{print $2; exit}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                local repo_url=$(echo "$expanded_config" | awk -F'=' '/^\[repository\]/{flag=1; next} flag&&/^url=/{print $2; exit}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+                # Create logfile in $log_dir
+                if [[ -n "$logfile" ]]; then
+                    logfile="$log_dir/$(basename "$logfile")"
+                    touch "$logfile" || {
+                        log_message "ERROR" "Failed to create logfile at $logfile"
+                        echo "Error: Failed to create logfile at $logfile."
+                        return 1
+                    }
+                    chmod 644 "$logfile"
+                    log_message "INFO" "Created log file for '$plugin_name' at $logfile"
+                    echo "Created log file at $logfile."
+                else
+                    log_message "WARNING" "No logfile specified in $config_file"
+                    echo "Warning: No logfile specified."
+                fi
+
+                # Update plugins.conf
                 local plugins_conf="$MYBASH_DIR/config/plugins.conf"
+                mkdir -p "$MYBASH_DIR/config"
                 if [[ ! -f "$plugins_conf" ]]; then
                     echo "# Plugin Configuration File" > "$plugins_conf"
                     echo "# Format: plugin_name=status (true/false)" >> "$plugins_conf"
+                    log_message "INFO" "Created $plugins_conf."
                 fi
                 if ! grep -q "^${plugin_name}=" "$plugins_conf" 2>/dev/null; then
                     echo "${plugin_name}=true" >> "$plugins_conf"
-                    log_message "INFO" "Registered and enabled plugin '$plugin_name' in $plugins_conf."
+                    log_message "INFO" "Registered and enabled plugin '$plugin_name' in $plugins_conf"
+                    echo "Registered and enabled plugin '$plugin_name' in $plugins_conf."
                 elif grep -q "^${plugin_name}=false" "$plugins_conf"; then
                     sed -i "" "s/^${plugin_name}=false/${plugin_name}=true/" "$plugins_conf"
-                    log_message "INFO" "Enabled plugin '$plugin_name' in $plugins_conf."
+                    log_message "INFO" "Enabled plugin '$plugin_name' in $plugins_conf"
+                    echo "Enabled plugin '$plugin_name' in $plugins_conf."
                 else
-                    log_message "INFO" "Plugin '$plugin_name' already enabled in $plugins_conf."
+                    log_message "INFO" "Plugin '$plugin_name' already enabled in $plugins_conf"
+                    echo "Plugin '$plugin_name' already enabled in $plugins_conf."
                 fi
 
-                update_or_insert_config "plugin_$plugin_name" "$plugin_dir"
-                source "$plugin_dir/${plugin_name}.zsh"  # Carga el plugin manualmente
-                if [[ $? -ne 0 ]]; then
-                    echo "Error: Failed to load plugin script $plugin_dir/${plugin_name}.zsh."
-                    exit 1
+                # Initialize git repository if repo= is present
+                if [[ -n "$repo_url" ]]; then
+                    cd "$source_dir"
+                    git init
+                    git add .
+                    git commit -m "Initial commit for $plugin_name plugin"
+                    log_message "INFO" "Initialized Git repository for '$plugin_name' at $source_dir with repo URL $repo_url"
+                    echo "Initialized Git repository for '$plugin_name'."
+                    cd - > /dev/null
                 fi
-                log_message "INFO" "Plugin '$plugin_name' installed successfully."
-                echo "Plugin '$plugin_name' installed successfully."
-                ;;
-            uninstall)
-                if [[ -z "$plugin_name" ]]; then
-                    echo "Error: Plugin name is required."
-                    echo "Usage: myb plugin uninstall <plugin_name>"
+
+                # Update database with dbconfig.zsh
+                local dbconfig_script="$MYBASH_DIR/plugins/dbconfig.zsh"
+                if [[ -f "$dbconfig_script" ]]; then
+                    zsh "$dbconfig_script"
+                    if [[ $? -eq 0 ]]; then
+                        log_message "INFO" "Updated all plugin configurations in database"
+                        echo "Updated all plugin configurations in database."
+                    else
+                        log_message "ERROR" "Failed to update plugin configurations in database"
+                        echo "Error: Failed to update plugin configurations."
+                        return 1
+                    fi
+                else
+                    log_message "ERROR" "dbconfig.zsh not found at $dbconfig_script"
+                    echo "Error: dbconfig.zsh not found."
                     return 1
                 fi
 
-                local plugin_dir="$PLUGINS_DIR/$plugin_name"
-                if [[ ! -d "$plugin_dir" ]]; then
-                    echo "Error: Plugin '$plugin_name' not found in $PLUGINS_DIR."
+                # Load the plugin script from source_dir
+                if [[ -f "$source_dir/main.zsh" ]]; then
+                    source "$source_dir/main.zsh"
+                    if [[ $? -eq 0 ]]; then
+                        log_message "INFO" "Plugin '$plugin_name' installed successfully"
+                        echo "Plugin '$plugin_name' installed successfully."
+                    else
+                        log_message "ERROR" "Failed to load plugin script $source_dir/main.zsh"
+                        echo "Error: Failed to load plugin script."
+                        return 1
+                    fi
+                else
+                    log_message "ERROR" "main.zsh not found in $source_dir"
+                    echo "Error: main.zsh not found."
                     return 1
                 fi
-
-                local plugins_conf="$MYBASH_DIR/config/plugins.conf"
-                if grep -q "^${plugin_name}=" "$plugins_conf" 2>/dev/null; then
-                    sed -i "" "/^${plugin_name}=/d" "$plugins_conf"
-                    log_message "INFO" "Removed plugin '$plugin_name' from $plugins_conf."
-                fi
-
-                sqlite3 "$DB_FILE" "DROP TABLE IF EXISTS ${plugin_name};"
-                log_message "INFO" "Dropped table '${plugin_name}' from database."
-
-                rm -rf "$plugin_dir"
-                log_message "INFO" "Deleted plugin directory $plugin_dir."
-                echo "Plugin '$plugin_name' uninstalled successfully."
                 ;;
             *)
                 echo "Error: Unknown action '$action'."
@@ -392,17 +401,8 @@
         esac
     }
 
-    update_or_insert_config() {
-        # No implementado aún; dejar vacío por ahora
-        :
-    }
-
     show_create_plugin_help() {
-        echo "Usage: myb plugin create <plugin_name> [--init-repo] [--install]"
-    }
-
-    show_install_plugin_help() {
-        echo "Usage: myb plugin install <plugin_name>"
+        echo "Usage: myb plugin create <plugin_name>"
     }
 
     # ==============================

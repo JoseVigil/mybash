@@ -1,5 +1,6 @@
 #!/bin/zsh
 
+# Ensure the script is running in Zsh
 if [[ -z "$ZSH_VERSION" ]]; then
     echo "Error: mybash requires Zsh. Please run this script using Zsh."
     exit 1
@@ -32,7 +33,22 @@ else
     exit 1
 fi
 
+# Define global arrays for commands
 typeset -A -g PLUGIN_COMMANDS
+typeset -A -g TOOL_DRIVER_COMMANDS
+
+# Load logger first and verify
+if [[ -f "$MYBASH_DIR/core/logger.zsh" ]]; then
+    source "$MYBASH_DIR/core/logger.zsh"
+    if ! typeset -f log_message > /dev/null; then
+        echo "Error: log_message not defined after sourcing $MYBASH_DIR/core/logger.zsh."
+        exit 1
+    fi
+    echo "Debug: log_message defined after sourcing logger.zsh."
+else
+    echo "Error: Logger script not found at $MYBASH_DIR/core/logger.zsh."
+    exit 1
+fi
 
 core_scripts=(
     "bkm.zsh"
@@ -40,13 +56,12 @@ core_scripts=(
     "completion.zsh"
     "env.zsh"
     "func.zsh"
-    "logger.zsh"
     "selfcheck.zsh"
 )
 for script in "${core_scripts[@]}"; do
     script_path="$MYBASH_DIR/core/$script"
     if [[ -f "$script_path" ]]; then
-        source "$script_path" >/dev/null 2>&1
+        source "$script_path"
         if [[ $? -ne 0 ]]; then
             echo "Error: Failed to source $script_path"
             exit 1
@@ -56,25 +71,27 @@ for script in "${core_scripts[@]}"; do
     fi
 done
 
+# Load tools from tools/drivers/
+for tool_dir in "$MYBASH_DIR/tools/drivers/"*; do
+    if [[ -d "$tool_dir" ]]; then
+        tool_script="$tool_dir/$(basename "$tool_dir").zsh"
+        if [[ -f "$tool_script" ]]; then
+            source "$tool_script" >/dev/null 2>&1
+            if [[ $? -ne 0 ]]; then
+                echo "Error: Failed to source tool $tool_script"
+                exit 1
+            fi
+        fi
+    fi
+done
+
+# Load plugins from plugins.conf
 if [[ -f "$MYBASH_DIR/core/loader.zsh" ]]; then
-    source "$MYBASH_DIR/core/loader.zsh" >/dev/null 2>&1
-    load_plugins
+    source "$MYBASH_DIR/core/loader.zsh" >/dev/null 2>&1    
 else
     echo "Error: Loader script 'loader.zsh' not found."
     exit 1
 fi
-
-run_tests() {
-    TEST_SCRIPT="$MYBASH_DIR/utils/test.zsh"
-    if [[ -f "$TEST_SCRIPT" ]]; then
-        echo "Running tests..."
-        bash "$TEST_SCRIPT"
-    else
-        echo "Error: Test script not found at $TEST_SCRIPT."
-        log_message "Error: Test script not found at $TEST_SCRIPT."
-        exit 1
-    fi
-}
 
 execute_cmd_main() {
     if declare -F cmd_main &>/dev/null; then
@@ -113,7 +130,9 @@ interactive_shell() {
         local module_or_cmd="$1"
         shift
         if [[ -n "$module_or_cmd" ]]; then
-            if [[ ${(k)PLUGIN_COMMANDS} =~ "$module_or_cmd\." ]]; then
+            if [[ -n "${TOOL_DRIVER_COMMANDS[$module_or_cmd]}" ]]; then
+                eval "${TOOL_DRIVER_COMMANDS[$module_or_cmd]}" "$@"
+            elif [[ ${(k)PLUGIN_COMMANDS} =~ "$module_or_cmd\." ]]; then
                 MYB_CURRENT_MODULE="$module_or_cmd"
                 if [[ -n "$1" ]]; then
                     local cmd_key="$module_or_cmd.$1"
@@ -193,22 +212,36 @@ show_help() {
     echo "  cmd              Execute custom commands."
     echo "  bkm              Execute bookmark-related commands."
     echo "  plugin           Manage plugins (clone, create, install, uninstall)."
+    echo "  start            Launch MyBash interface with tmuxinator."
+    echo "Tool commands:"
+    for tool in "${(k)TOOL_DRIVER_COMMANDS[@]}"; do
+        echo "  $tool"
+    done
     if [[ -n "${(k)PLUGIN_COMMANDS}" ]]; then
-        echo "  Plugin commands:"
-        for key in ${(k)PLUGIN_COMMANDS}; do
-            echo "    ${key%%.*} ${key#*.}    Run ${PLUGIN_COMMANDS[$key]}"
+        echo "Plugin commands:"
+        for key in "${(k)PLUGIN_COMMANDS[@]}"; do
+            echo "  ${key%%.*} ${key#*.}    Run ${PLUGIN_COMMANDS[$key]}"
         done
     fi
 }
 
 unknown_command() {
     if [[ -z "$1" ]]; then
-        return 0
+        interactive_shell
     else
         echo "Unknown command: $1"
         show_help
         exit 1
     fi
+}
+
+start_mybash() {
+    echo "Starting MyBash interface with tmuxinator..."
+    tmuxinator start mybash || {
+        log_message "ERROR" "Failed to start tmuxinator. Ensure it is installed and mybash.yml exists."
+        echo "Error: Failed to start tmuxinator. Ensure it is installed and mybash.yml exists."
+        return 1
+    }
 }
  
 if [[ $# -ge 2 ]]; then
@@ -220,7 +253,6 @@ if [[ $# -ge 2 ]]; then
 fi
 
 case "$1" in
-    test) run_tests "$@" ;;
     help) show_help ;;
     mypy) execute_mypy "${@:2}" ;;
     help-ext) show_ext_help ;;
@@ -235,6 +267,15 @@ case "$1" in
     env) env_main "${@:2}" ;;
     conda) conda_main "${@:2}" ;;
     plugin) 
-        plugin_main "${@:2}" ;;
-    *) unknown_command "$1" ;;
+        log_message "INFO" "Calling plugin_main with args: ${@:2}"
+        plugin_main "${@:2}" 
+        ;;
+    start) start_mybash ;;
+    *) 
+        if [[ -n "${TOOL_DRIVER_COMMANDS[$1]}" ]]; then
+            eval "${TOOL_DRIVER_COMMANDS[$1]}" "${@:2}"
+        else
+            unknown_command "$1"
+        fi
+        ;;
 esac

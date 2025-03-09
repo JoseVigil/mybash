@@ -8,8 +8,8 @@ fi
 
 # Check for sudo privileges at the start
 if [[ $EUID -ne 0 ]]; then
-    echo "Este script requiere privilegios de sudo para algunas operaciones (e.g., /usr/local/bin, /opt/mybash)."
-    echo "Por favor, corre con sudo: sudo zsh $0 $@"
+    echo "This script requires sudo privileges for some operations (e.g., /usr/local/bin, /opt/mybash)."
+    echo "Please run with sudo: sudo zsh $0 $@"
     exit 1
 fi
 
@@ -21,18 +21,18 @@ export MYBASH_INSTALL_MODE=true
 # Function to select custom directory for MYBASH_DATA_HOME_DIR via Finder
 select_custom_directory() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        SELECTED_FOLDER=$(osascript -e 'tell application "Finder" to set selectedFolder to choose folder with prompt "Selecciona una carpeta para datos de mybash:"' -e 'POSIX path of selectedFolder' 2>/dev/null)
+        SELECTED_FOLDER=$(osascript -e 'tell application "Finder" to set selectedFolder to choose folder with prompt "Select a folder for mybash data:"' -e 'POSIX path of selectedFolder' 2>/dev/null)
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        SELECTED_FOLDER=$(zenity --file-selection --directory --title="Selecciona una carpeta para datos de mybash" 2>/dev/null)
+        SELECTED_FOLDER=$(zenity --file-selection --directory --title="Select a folder for mybash data" 2>/dev/null)
     else
-        echo "Selección de carpeta no soportada en este sistema operativo."
+        echo "Folder selection not supported on this operating system."
         exit 1
     fi
     if [[ -n "$SELECTED_FOLDER" ]]; then
-        echo "Carpeta seleccionada: $SELECTED_FOLDER"
+        echo "Selected folder: $SELECTED_FOLDER"
         echo "$SELECTED_FOLDER"
     else
-        echo "No se seleccionó ninguna carpeta. Usando predeterminado."
+        echo "No folder selected. Using default."
         return 1
     fi
 }
@@ -41,6 +41,9 @@ select_custom_directory() {
 MODE="prod"  # Default mode
 while [[ "$#" -gt 0 ]]; do
     case "$1" in
+        install)
+            shift
+            ;;
         --dev)
             MODE="dev"
             shift
@@ -52,16 +55,16 @@ while [[ "$#" -gt 0 ]]; do
         --prefix)
             if [[ -n "$2" ]]; then
                 MYBASH_DATA_HOME_DIR="$2"
-                echo "Usando --prefix: MYBASH_DATA_HOME_DIR establecido en $MYBASH_DATA_HOME_DIR"
+                echo "Using --prefix: MYBASH_DATA_HOME_DIR set to $MYBASH_DATA_HOME_DIR"
                 shift 2
             else
-                echo "Error: --prefix requiere una ruta."
+                echo "Error: --prefix requires a path."
                 exit 1
             fi
             ;;
         *)
-            echo "Opción desconocida: $1"
-            echo "Uso: $0 [--dev | --prod | --prefix <ruta>]"
+            echo "Unknown option: $1"
+            echo "Usage: $0 [install] [--dev | --prod | --prefix <path>]"
             exit 1
             ;;
     esac
@@ -70,63 +73,72 @@ done
 # Ask user for MYBASH_DATA_HOME_DIR if not set by --prefix
 if [[ -z "$MYBASH_DATA_HOME_DIR" ]]; then
     DEFAULT_DATA_DIR="/Users/$SUDO_USER/mybash"
-    echo "¿Deseas instalar los datos de mybash en $DEFAULT_DATA_DIR? (y/n):"
-    echo "Si respondes 'n', podrás elegir otra ubicación con Finder."
+    echo "Do you want to install mybash data in $DEFAULT_DATA_DIR? (y/n):"
+    echo "If you answer 'n', you can choose another location with Finder."
     read custom_choice
     if [[ "$custom_choice" == "n" || "$custom_choice" == "N" ]]; then
-        echo "Por favor, selecciona una carpeta para los datos de mybash."
+        echo "Please select a folder for mybash data."
         MYBASH_DATA_HOME_DIR=$(select_custom_directory)
         if [[ -z "$MYBASH_DATA_HOME_DIR" ]]; then
-            echo "No se seleccionó una carpeta válida. Usando $DEFAULT_DATA_DIR por defecto."
+            echo "No valid folder selected. Using $DEFAULT_DATA_DIR by default."
             MYBASH_DATA_HOME_DIR="$DEFAULT_DATA_DIR"
         fi
     else
         MYBASH_DATA_HOME_DIR="$DEFAULT_DATA_DIR"
-        echo "Usando ubicación predeterminada: $MYBASH_DATA_HOME_DIR"
+        echo "Using default location: $MYBASH_DATA_HOME_DIR"
     fi
 else
-    echo "Usando MYBASH_DATA_HOME_DIR establecido por --prefix: $MYBASH_DATA_HOME_DIR"
+    echo "Using MYBASH_DATA_HOME_DIR set by --prefix: $MYBASH_DATA_HOME_DIR"
 fi
 
 # Set log directory and file
 logs_dir="$MYBASH_DATA_HOME_DIR/logs"
 export LOG_FILE="$logs_dir/mybash.log"  # Export LOG_FILE for logger.zsh
 
+# Set plugins directory
+export MYBASH_PLUGINS_DIR="$MYBASH_DATA_HOME_DIR/plugins"
+mkdir -p "$MYBASH_PLUGINS_DIR" || {
+    echo "Error: Could not create plugins directory at $MYBASH_PLUGINS_DIR"
+    exit 1
+}
+chown -R "$SUDO_USER":staff "$MYBASH_PLUGINS_DIR"
+chmod 755 "$MYBASH_PLUGINS_DIR"
+
 # Debug: Print variables and directory status before action
 echo "DEBUG: MYBASH_DIR=$MYBASH_DIR"
 echo "DEBUG: MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR"
 echo "DEBUG: logs_dir=$logs_dir"
 echo "DEBUG: LOG_FILE=$LOG_FILE"
-echo "DEBUG: Estado actual del directorio:"
-ls -ld "$logs_dir" 2>/dev/null || echo "DEBUG: El directorio no existe aún"
+echo "DEBUG: Current directory status:"
+ls -ld "$logs_dir" 2>/dev/null || echo "DEBUG: The directory does not exist yet"
 
 # Ensure log directory and file exist with correct permissions
 mkdir -p "$logs_dir" || {
-    echo "Error: No se pudo crear el directorio de logs en $logs_dir"
+    echo "Error: Could not create log directory at $logs_dir"
     echo "Error: Failed to create log directory at $logs_dir" >> "/tmp/mybash_install.log"
     exit 1
 }
 touch "$LOG_FILE" || {
-    echo "Error: No se pudo crear el archivo de log en $LOG_FILE"
+    echo "Error: Could not create log file at $LOG_FILE"
     exit 1
 }
 chown -R "$SUDO_USER":staff "$MYBASH_DATA_HOME_DIR" || {
-    echo "Error: No se pudo cambiar el propietario de $MYBASH_DATA_HOME_DIR a $SUDO_USER"
+    echo "Error: Could not change ownership of $MYBASH_DATA_HOME_DIR to $SUDO_USER"
     exit 1
 }
 chmod 755 "$logs_dir" || {
-    echo "Error: No se pudieron establecer permisos en $logs_dir"
+    echo "Error: Could not set permissions on $logs_dir"
     exit 1
 }
 chmod 644 "$LOG_FILE" || {
-    echo "Error: No se pudieron establecer permisos en $LOG_FILE"
+    echo "Error: Could not set permissions on $LOG_FILE"
     exit 1
 }
-echo "DEBUG: Estado del directorio y archivo después de ajuste:"
+echo "DEBUG: Directory and file status after setup:"
 ls -ld "$logs_dir" "$LOG_FILE"
 
 # Debug: Verify directory after creation/adjustment
-echo "DEBUG: Estado del directorio después de ajuste:"
+echo "DEBUG: Directory status after setup:"
 ls -ld "$logs_dir"
 
 # Load logger with the proper LOG_FILE
@@ -148,7 +160,7 @@ if [[ -f "$MYBASH_DIR/core/func.zsh" ]]; then
     source "$MYBASH_DIR/core/func.zsh"
 else
     log_message "ERROR" "func.zsh not found at $MYBASH_DIR/core/func.zsh."
-    echo "Error: func.zsh no encontrado en $MYBASH_DIR/core/func.zsh."
+    echo "Error: func.zsh not found at $MYBASH_DIR/core/func.zsh."
     exit 1
 fi
 
@@ -158,13 +170,13 @@ check_required_variables() {
     for var in MYBASH_DIR PLUGINS_DIR MYBASH_DATA_DIR DB_FILE SCHEMA_FILE DEPENDENCIES_CONF MYBASH_VENV; do
         if [[ -z "${(P)var}" ]]; then
             log_message "ERROR" "Required variable '$var' is not defined."
-            echo "Error: Variable requerida '$var' no está definida."
+            echo "Error: Required variable '$var' is not defined."
             missing=true
         fi
     done
     if [[ "$missing" = true ]]; then
         log_message "ERROR" "One or more required variables are missing. Check global.zsh."
-        echo "Error: Faltan una o más variables requeridas. Revisa global.zsh."
+        echo "Error: One or more required variables are missing. Check global.zsh."
         exit 1
     fi
 }
@@ -182,7 +194,7 @@ show_install_plan() {
     echo "Do you want to proceed? (y/n): "
     read choice
     if [[ "$choice" != "y" && "$choice" != "Y" ]]; then
-        echo "Instalación cancelada."
+        echo "Installation canceled."
         log_message "INFO" "Installation canceled by user."
         exit 0
     fi
@@ -195,7 +207,7 @@ load_dependencies() {
     local current_os=""
     if [[ ! -f "$DEPENDENCIES_CONF" ]]; then
         log_message "ERROR" "Dependencies file not found at $DEPENDENCIES_CONF."
-        echo "Error: Archivo de dependencias no encontrado en $DEPENDENCIES_CONF."
+        echo "Error: Dependencies file not found at $DEPENDENCIES_CONF."
         exit 1
     fi
     while IFS='=' read -r package details url install_cmd; do
@@ -213,14 +225,23 @@ load_dependencies() {
 # Function to install dependencies
 install_dependencies() {
     log_message "INFO" "Checking dependencies..."
-    echo "Verificando dependencias..."
+    echo "Checking dependencies..."
+
+    # Check if tmuxinator is installed (required for myb start)
+    if ! command -v tmuxinator &>/dev/null; then
+        log_message "ERROR" "Tmuxinator not found. It is required for MyBash. Please install it manually (see README.md)."
+        echo "Error: Tmuxinator not found. It is required for MyBash."
+        echo "Install it manually following the instructions in README.md and try again."
+        exit 1
+    fi
+
     if [[ "$OSTYPE" == "darwin"* ]]; then
         if ! command -v brew &>/dev/null; then
             log_message "INFO" "Homebrew not found. Installing Homebrew as $SUDO_USER..."
-            echo "Instalando Homebrew como $SUDO_USER..."
+            echo "Homebrew not found. Installing Homebrew as $SUDO_USER..."
             sudo -u "$SUDO_USER" /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || {
                 log_message "ERROR" "Failed to install Homebrew."
-                echo "Error: No se pudo instalar Homebrew. Instálalo manualmente."
+                echo "Error: Failed to install Homebrew. Please install it manually."
                 exit 1
             }
         fi
@@ -229,89 +250,108 @@ install_dependencies() {
             rest="${dep#*=}"
             description="${rest%%=*}"
             install_cmd="${rest#*=}"
-            if command -v "$package" &>/dev/null; then
-                log_message "INFO" "$description ya está instalado en el sistema (encontrado en PATH). Omitiendo."
-                echo "$description ya está instalado en el sistema (encontrado en PATH). Omitiendo."
-            else
-                log_message "INFO" "Instalando $description ($package) con '$install_cmd' como $SUDO_USER..."
-                echo "Instalando $description ($package)..."
-                sudo -u "$SUDO_USER" zsh -c "$install_cmd" 2>&1 | tee -a "$LOG_FILE" || {
-                    log_message "ERROR" "Failed to install $package. Check $LOG_FILE for details."
-                    echo "Error: No se pudo instalar $package. Revisa $LOG_FILE para más detalles."
-                    exit 1
-                }
+            if [[ "$install_cmd" == brew* ]]; then
+                brew_package=$(echo "$install_cmd" | sed 's/brew install //')
+                if sudo -u "$SUDO_USER" brew list | grep -q "^${brew_package}$"; then
+                    log_message "INFO" "$description already installed with Homebrew ($brew_package). Skipping."
+                    echo "$description already installed with Homebrew ($brew_package). Skipping."
+                else
+                    log_message "INFO" "Installing $description ($brew_package) with '$install_cmd' as $SUDO_USER..."
+                    echo "Installing $description ($brew_package)..."
+                    sudo -u "$SUDO_USER" zsh -c "$install_cmd" 2>&1 | tee -a "$LOG_FILE" || {
+                        log_message "ERROR" "Failed to install $brew_package. Check $LOG_FILE for details."
+                        echo "Error: Failed to install $brew_package. Check $LOG_FILE for details."
+                        exit 1
+                    }
+                fi
+            elif [[ "$install_cmd" == pip* ]]; then
+                # Use pip3.11 from Python 3.11
+                if sudo -u "$SUDO_USER" /usr/local/Cellar/python@3.11/3.11.11/bin/pip3.11 list 2>/dev/null | grep -q "^$package "; then
+                    log_message "INFO" "$description already installed with pip3.11 ($package). Skipping."
+                    echo "$description already installed with pip3.11 ($package). Skipping."
+                else
+                    log_message "INFO" "Installing $description ($package) with pip3.11 as $SUDO_USER..."
+                    echo "Installing $description ($package)..."
+                    sudo -u "$SUDO_USER" /usr/local/Cellar/python@3.11/3.11.11/bin/pip3.11 install "$package" 2>&1 | tee -a "$LOG_FILE" || {
+                        log_message "ERROR" "Failed to install $package with pip3.11. Check $LOG_FILE for details."
+                        echo "Error: Failed to install $package with pip3.11. Check $LOG_FILE for details."
+                        exit 1
+                    }
+                fi
             fi
         done
     elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        # ... (Linux-specific code) ...
+        log_message "ERROR" "Linux support not implemented yet."
+        echo "Linux support not implemented yet."
+        exit 1
     else
-        log_message "ERROR" "Sistema operativo no soportado para instalación automática de dependencias."
-        echo "Sistema operativo no soportado para instalación automática de dependencias."
+        log_message "ERROR" "Operating system not supported for automatic dependency installation."
+        echo "Operating system not supported for automatic dependency installation."
         exit 1
     fi
     log_message "INFO" "Dependency check completed."
-    echo "Verificación de dependencias completada."
+    echo "Dependency check completed."
 }
 
 # Function to create data directories
 create_data_directories() {
     log_message "INFO" "Creating data directories in $MYBASH_DATA_DIR..."
-    echo "Creando directorios de datos en $MYBASH_DATA_DIR..."
+    echo "Creating data directories in $MYBASH_DATA_DIR..."
     mkdir -p "$MYBASH_DATA_DIR/log" "$MYBASH_DATA_DIR/migrate/environments" \
              "$MYBASH_DATA_DIR/migrate/import" "$MYBASH_DATA_DIR/migrate/export" \
              "$MYBASH_BACKUP_DIR" "$MYBASH_LOGS_DIR" "$MYBASH_VENVIRONMENTS" \
              "$(dirname "$BKM_BOOKMARK_FILE")" "$(dirname "$CMD_BOOKMARK_FILE")" \
              "$PLUGINS_DIR" || {
         log_message "ERROR" "Failed to create directories."
-        echo "Error: No se pudieron crear los directorios."
+        echo "Error: Failed to create directories."
         exit 1
     }
     touch "$BKM_BOOKMARK_FILE" "$CMD_BOOKMARK_FILE" "$LOG_FILE" || {
         log_message "ERROR" "Failed to create bookmark or log files."
-        echo "Error: No se pudieron crear los archivos de marcadores o log."
+        echo "Error: Failed to create bookmark or log files."
         exit 1
     }
     chown -R "$SUDO_USER":staff "$MYBASH_DATA_HOME_DIR" || {
         log_message "ERROR" "Failed to set ownership to $SUDO_USER."
-        echo "Error: No se pudo establecer el propietario en $SUDO_USER."
+        echo "Error: Failed to set ownership to $SUDO_USER."
         exit 1
     }
     chmod -R u+rw "$MYBASH_DATA_HOME_DIR" || {
         log_message "ERROR" "Failed to set permissions on $MYBASH_DATA_HOME_DIR."
-        echo "Error: No se pudieron establecer permisos en $MYBASH_DATA_HOME_DIR."
+        echo "Error: Failed to set permissions on $MYBASH_DATA_HOME_DIR."
         exit 1
     }
     chmod 644 "$BKM_BOOKMARK_FILE" "$CMD_BOOKMARK_FILE" "$LOG_FILE" || {
         log_message "ERROR" "Failed to set file permissions."
-        echo "Error: No se pudieron establecer permisos en los archivos."
+        echo "Error: Failed to set file permissions."
         exit 1
     }
     log_message "INFO" "Data directories and files created successfully with correct permissions."
-    echo "Directorios y archivos de datos creados exitosamente con permisos correctos."
+    echo "Data directories and files created successfully with correct permissions."
 }
 
 # Function to initialize SQLite database
 initialize_database() {
     log_message "INFO" "Initializing database at $DB_FILE..."
-    echo "Inicializando base de datos en $DB_FILE..."
+    echo "Initializing database at $DB_FILE..."
     if [[ ! -f "$SCHEMA_FILE" ]]; then
         log_message "ERROR" "Schema file not found at $SCHEMA_FILE."
-        echo "Error: Archivo de esquema no encontrado en $SCHEMA_FILE."
+        echo "Error: Schema file not found at $SCHEMA_FILE."
         exit 1
     fi
     if [[ ! -f "$DB_FILE" ]]; then
         log_message "INFO" "Database file not found. Creating and initializing database..."
-        echo "Archivo de base de datos no encontrado. Creando e inicializando base de datos..."
+        echo "Database file not found. Creating and initializing database..."
         sudo -u "$SUDO_USER" sqlite3 "$DB_FILE" < "$SCHEMA_FILE" >>"$LOG_FILE" 2>&1 || {
             log_message "ERROR" "Failed to initialize database."
-            echo "Error: No se pudo inicializar la base de datos. Revisa $LOG_FILE."
+            echo "Error: Failed to initialize database. Check $LOG_FILE."
             exit 1
         }
         log_message "INFO" "Database initialized successfully."
-        echo "Base de datos inicializada exitosamente."
+        echo "Database initialized successfully."
     else
         log_message "INFO" "Database already exists at $DB_FILE. Skipping initialization."
-        echo "La base de datos ya existe en $DB_FILE. Omitiendo inicialización."
+        echo "Database already exists at $DB_FILE. Skipping initialization."
     fi
     update_or_insert_config "app_path" "$MYBASH_DIR"
 }
@@ -324,14 +364,14 @@ update_or_insert_config() {
     if sudo -u "$SUDO_USER" sqlite3 "$DB_FILE" "SELECT COUNT(*) FROM config WHERE key = '$key';" | grep -q "1"; then
         sudo -u "$SUDO_USER" sqlite3 "$DB_FILE" "UPDATE config SET value = '$value' WHERE key = '$key';" || {
             log_message "ERROR" "Failed to update config: $key=$value"
-            echo "Error: No se pudo actualizar la configuración. Revisa $LOG_FILE."
+            echo "Error: Failed to update configuration. Check $LOG_FILE."
             exit 1
         }
         log_message "INFO" "Updated config: $key=$value"
     else
         sudo -u "$SUDO_USER" sqlite3 "$DB_FILE" "INSERT INTO config (key, value) VALUES ('$key', '$value');" || {
             log_message "ERROR" "Failed to insert config: $key=$value"
-            echo "Error: No se pudo insertar la configuración. Revisa $LOG_FILE."
+            echo "Error: Failed to insert configuration. Check $LOG_FILE."
             exit 1
         }
         log_message "INFO" "Inserted config: $key=$value"
@@ -342,35 +382,32 @@ update_or_insert_config() {
 add_to_zshrc() {
     local zshrc="/Users/$SUDO_USER/.zshrc"
     log_message "INFO" "Adding main.zsh to $zshrc..."
-    echo "Añadiendo main.zsh a $zshrc..."
-    # Remove any existing MyBash lines
-    sed -i.bak "/[#]*source.*mybash.*main.zsh/d" "$zshrc" 2>>"$LOG_FILE"
-    sed -i.bak "/[#]*source.*mybash.*core\/completion.zsh/d" "$zshrc" 2>>"$LOG_FILE"
-    rm -f "$zshrc.bak"
-    # Add main.zsh after Conda block if it exists, otherwise at the end
-    if grep -q "# <<< conda initialize <<<" "$zshrc"; then
-        sed -i.bak "/# <<< conda initialize <<</a source $MYBASH_DIR/main.zsh" "$zshrc" 2>>"$LOG_FILE"
-    else
-        echo "source $MYBASH_DIR/main.zsh" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+    echo "Adding main.zsh to $zshrc..."
+    if ! grep -q "source \$MYBASH_DIR/main.zsh" "$zshrc"; then
+        echo "" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "# Source MyBash main script" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "if [[ -f \"\$MYBASH_DIR/main.zsh\" ]]; then" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "    source \"\$MYBASH_DIR/main.zsh\"" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "fi" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
     fi
     log_message "INFO" "Added main.zsh to $zshrc."
-    echo "main.zsh añadido a $zshrc."
+    echo "main.zsh added to $zshrc."
 }
 
+# Function to add completion to ~/.zshrc
 add_completion_to_zshrc() {
-    local completion_file="$MYBASH_DIR/core/completion.zsh"
     local zshrc="/Users/$SUDO_USER/.zshrc"
     log_message "INFO" "Adding completion.zsh to $zshrc..."
-    echo "Añadiendo completion.zsh a $zshrc..."
-    # Add completion.zsh after main.zsh
-    if grep -q "source $MYBASH_DIR/main.zsh" "$zshrc"; then
-        sed -i.bak "/source $MYBASH_DIR\/main.zsh/a source $completion_file" "$zshrc" 2>>"$LOG_FILE"
-    else
-        echo "source $completion_file" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+    echo "Adding completion.zsh to $zshrc..."
+    if ! grep -q "source \$MYBASH_DIR/core/completion.zsh" "$zshrc"; then
+        echo "" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "# Source MyBash autocompletion" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "if [[ -f \"\$MYBASH_DIR/core/completion.zsh\" ]]; then" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "    source \"\$MYBASH_DIR/core/completion.zsh\"" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "fi" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
     fi
-    rm -f "$zshrc.bak"
     log_message "INFO" "Added completion.zsh to $zshrc."
-    echo "completion.zsh añadido a $zshrc."
+    echo "completion.zsh added to $zshrc."
 }
 
 # Function to create myb wrapper
@@ -379,19 +416,19 @@ create_myb_wrapper() {
     local parent_dir=$(dirname "$myb_wrapper")
     if [[ ! -d "$parent_dir" ]]; then
         log_message "INFO" "Directory $parent_dir does not exist. Creating it..."
-        echo "El directorio $parent_dir no existe. Creándolo..."
+        echo "Directory $parent_dir does not exist. Creating it..."
         sudo mkdir -p "$parent_dir" || {
             log_message "ERROR" "Failed to create directory $parent_dir."
-            echo "Error: No se pudo crear el directorio $parent_dir."
+            echo "Error: Failed to create directory $parent_dir."
             exit 1
         }
     fi
     if [[ -d "$myb_wrapper" ]]; then
         log_message "ERROR" "$myb_wrapper is a directory. Removing it..."
-        echo "Error: $myb_wrapper es un directorio. Eliminándolo..."
+        echo "Error: $myb_wrapper is a directory. Removing it..."
         sudo rm -rf "$myb_wrapper" || {
             log_message "ERROR" "Failed to remove directory $myb_wrapper."
-            echo "Error: No se pudo eliminar el directorio $myb_wrapper."
+            echo "Error: Failed to remove directory $myb_wrapper."
             exit 1
         }
     fi
@@ -399,36 +436,36 @@ create_myb_wrapper() {
     echo '# Wrapper to ensure main.zsh runs in Zsh' | sudo tee -a "$myb_wrapper" >/dev/null
     echo "REAL_SCRIPT=\"$MYBASH_DIR/main.zsh\"" | sudo tee -a "$myb_wrapper" >/dev/null
     echo "if ! command -v zsh &> /dev/null; then" | sudo tee -a "$myb_wrapper" >/dev/null
-    echo "    echo \"Error: Zsh no está instalado.\" >&2" | sudo tee -a "$myb_wrapper" >/dev/null
+    echo "    echo \"Error: Zsh is not installed.\" >&2" | sudo tee -a "$myb_wrapper" >/dev/null
     echo "    exit 1" | sudo tee -a "$myb_wrapper" >/dev/null
     echo "fi" | sudo tee -a "$myb_wrapper" >/dev/null
     echo "exec zsh \"\$REAL_SCRIPT\" \"\$@\"" | sudo tee -a "$myb_wrapper" >/dev/null
     sudo chmod 755 "$myb_wrapper" || {
         log_message "ERROR" "Failed to set executable permissions on $myb_wrapper."
-        echo "Error: No se pudieron establecer permisos ejecutables en $myb_wrapper."
+        echo "Error: Failed to set executable permissions on $myb_wrapper."
         exit 1
     }
     if [[ ! -f "$myb_wrapper" ]]; then
         log_message "ERROR" "Failed to create myb wrapper at $myb_wrapper."
-        echo "Error: No se pudo crear el wrapper myb en $myb_wrapper."
+        echo "Error: Failed to create myb wrapper at $myb_wrapper."
         exit 1
     fi
     log_message "INFO" "Wrapper created successfully at $myb_wrapper."
-    echo "Wrapper creado exitosamente en $myb_wrapper."
+    echo "Wrapper created successfully at $myb_wrapper."
 }
 
 # Function to create symbolic links in /usr/local/bin
 create_symlinks() {
     log_message "INFO" "Creating symbolic links in /usr/local/bin..."
-    echo "Creando enlaces simbólicos en /usr/local/bin..."
+    echo "Creating symbolic links in /usr/local/bin..."
     local myb_wrapper="/usr/local/bin/myb"
 
     if [[ -e "$myb_wrapper" ]]; then
         log_message "INFO" "Removing existing myb wrapper..."
-        echo "Eliminando wrapper myb existente..."
+        echo "Removing existing myb wrapper..."
         sudo rm -f "$myb_wrapper" || {
             log_message "ERROR" "Failed to remove existing $myb_wrapper."
-            echo "Error: No se pudo eliminar el enlace existente $myb_wrapper."
+            echo "Error: Failed to remove existing $myb_wrapper."
             exit 1
         }
     fi
@@ -437,144 +474,138 @@ create_symlinks() {
 
     if [[ ! -x "$MYBASH_DIR/main.zsh" ]]; then
         log_message "INFO" "Making main.zsh executable..."
-        echo "Haciendo main.zsh ejecutable..."
+        echo "Making main.zsh executable..."
         sudo chmod 755 "$MYBASH_DIR/main.zsh" || {
             log_message "ERROR" "Failed to set executable permissions on $MYBASH_DIR/main.zsh."
-            echo "Error: No se pudieron establecer permisos ejecutables en $MYBASH_DIR/main.zsh."
+            echo "Error: Failed to set executable permissions on $MYBASH_DIR/main.zsh."
             exit 1
         }
     fi
 
     log_message "INFO" "Verifying installation..."
-    echo "Verificando instalación..."
+    echo "Verifying installation..."
     if [[ -x "/usr/local/bin/myb" ]]; then
         log_message "INFO" "✅ myb installation successful!"
-        echo "✓ Instalación de myb exitosa!"
+        echo "✅ myb installation successful!"
     else
         log_message "ERROR" "❌ myb installation failed. Please check logs."
-        echo "❌ Instalación de myb fallida. Revisa los logs."
+        echo "❌ myb installation failed. Please check logs."
         exit 1
     fi
 
     log_message "INFO" "Only creating 'myb' symlink as single entry point."
-    echo "Solo se crea el enlace 'myb' como punto de entrada único."
+    echo "Only creating 'myb' symlink as single entry point."
 }
 
 # Function to set up Python virtual environment
+# setup_python_venv() {
+#     if [[ ! -d "$MYBASH_VENV" ]]; then
+#         log_message "INFO" "Creating Python venv at $MYBASH_VENV"
+#         echo "Creating Python virtual environment at $MYBASH_VENV..."
+#         sudo mkdir -p "$(dirname "$MYBASH_VENV")"
+#         sudo chown -R "$SUDO_USER":staff "$(dirname "$MYBASH_VENV")"
+#         sudo -u "$SUDO_USER" python3 -m venv "$MYBASH_VENV" || {
+#             log_message "ERROR" "Failed to create Python venv"
+#             echo "Error: Failed to create Python virtual environment."
+#             exit 1
+#         }
+#     else
+#         log_message "INFO" "Python venv exists at $MYBASH_VENV"
+#         echo "Python virtual environment already exists at $MYBASH_VENV."
+#     fi
+#     sudo -u "$SUDO_USER" zsh -c "source $MYBASH_VENV/bin/activate && pip install psutil" >>"$LOG_FILE" 2>&1 || {
+#         log_message "ERROR" "Failed to activate Python venv or install psutil. Check $LOG_FILE."
+#         echo "Error: Failed to activate Python virtual environment or install psutil. Check $LOG_FILE."
+#         exit 1
+#     }
+#     log_message "INFO" "Successfully installed 'psutil' in Python venv."
+#     echo "'psutil' successfully installed in Python virtual environment."
+# }
+
+
+# Function to set up Python virtual environment, hardcoded for python3.11 
 setup_python_venv() {
     if [[ ! -d "$MYBASH_VENV" ]]; then
         log_message "INFO" "Creating Python venv at $MYBASH_VENV"
-        echo "Creando entorno virtual de Python en $MYBASH_VENV..."
+        echo "Creating Python virtual environment at $MYBASH_VENV..."
         sudo mkdir -p "$(dirname "$MYBASH_VENV")"
         sudo chown -R "$SUDO_USER":staff "$(dirname "$MYBASH_VENV")"
-        sudo -u "$SUDO_USER" python3 -m venv "$MYBASH_VENV" || {
-            log_message "ERROR" "Failed to create Python venv"
-            echo "Error: No se pudo crear el entorno virtual de Python."
+        # Use direct path to python3.11 from Cellar
+        sudo -u "$SUDO_USER" /usr/local/Cellar/python@3.11/3.11.11/bin/python3.11 -m venv "$MYBASH_VENV" || {
+            log_message "ERROR" "Failed to create Python venv with python3.11"
+            echo "Error: Failed to create Python virtual environment."
             exit 1
         }
     else
         log_message "INFO" "Python venv exists at $MYBASH_VENV"
-        echo "El entorno virtual de Python ya existe en $MYBASH_VENV."
+        echo "Python virtual environment already exists at $MYBASH_VENV."
     fi
-    # Activate venv and install psutil in one Zsh command
-    sudo -u "$SUDO_USER" zsh -c "source $MYBASH_VENV/bin/activate && pip install psutil" >>"$LOG_FILE" 2>&1 || {
+    sudo -u "$SUDO_USER" zsh -c "source $MYBASH_VENV/bin/activate && pip install --no-cache-dir psutil" >>"$LOG_FILE" 2>&1 || {
         log_message "ERROR" "Failed to activate Python venv or install psutil. Check $LOG_FILE."
-        echo "Error: No se pudo activar el entorno virtual de Python o instalar psutil. Revisa $LOG_FILE."
+        echo "Error: Failed to activate Python virtual environment or install psutil. Check $LOG_FILE."
         exit 1
     }
     log_message "INFO" "Successfully installed 'psutil' in Python venv."
-    echo "'psutil' instalado exitosamente en el entorno virtual de Python."
-}
-
-# Function to set up Conda environment
-setup_conda_env() {
-    local conda_env_name="mybash_conda"
-    # Check if conda is installed and accessible as $SUDO_USER
-    if ! sudo -u "$SUDO_USER" command -v conda &>/dev/null; then
-        log_message "WARNING" "Conda not installed or not found in PATH for $SUDO_USER. Skipping Conda environment setup."
-        echo "Advertencia: Conda no está instalado o no se encuentra en el PATH para $SUDO_USER. Omitiendo configuración de entorno Conda."
-        return 0  # Continue without Conda
-    fi
-    sudo mkdir -p "$(dirname "$MYBASH_CONDA")"
-    sudo chown -R "$SUDO_USER":staff "$(dirname "$MYBASH_CONDA")"
-    if sudo -u "$SUDO_USER" HOME="/Users/$SUDO_USER" conda env list | grep -q "^$conda_env_name "; then
-        log_message "INFO" "Conda env $conda_env_name exists"
-        echo "El entorno Conda $conda_env_name ya existe."
-    else
-        log_message "INFO" "Creating conda env at $MYBASH_CONDA"
-        echo "Creando entorno Conda en $MYBASH_CONDA..."
-        sudo -u "$SUDO_USER" HOME="/Users/$SUDO_USER" conda create -y -p "$MYBASH_CONDA" python=3.8 >>"$LOG_FILE" 2>&1 || {
-            log_message "WARNING" "Failed to create conda env. Check $LOG_FILE for details. Continuing without Conda."
-            echo "Advertencia: No se pudo crear el entorno Conda. Revisa $LOG_FILE para más detalles. Continuando sin Conda."
-            return 0  # Continue without Conda
-        }
-    fi
-    eval "$(sudo -u "$SUDO_USER" HOME="/Users/$SUDO_USER" conda shell.zsh hook)" || {
-        log_message "WARNING" "Failed to initialize conda shell hook. Skipping Conda package installation."
-        echo "Advertencia: No se pudo inicializar el hook de shell de Conda. Omitiendo instalación de paquetes Conda."
-        return 0
-    }
-    sudo -u "$SUDO_USER" HOME="/Users/$SUDO_USER" conda activate "$MYBASH_CONDA" || {
-        log_message "WARNING" "Failed to activate conda env. Skipping package installation."
-        echo "Advertencia: No se pudo activar el entorno Conda. Omitiendo instalación de paquetes."
-        return 0
-    }
-    if ! sudo -u "$SUDO_USER" HOME="/Users/$SUDO_USER" conda install -y numpy pandas >>"$LOG_FILE" 2>&1; then
-        log_message "WARNING" "Failed to install conda packages. Check $LOG_FILE."
-        echo "Advertencia: No se pudieron instalar los paquetes de Conda. Revisa $LOG_FILE."
-        conda deactivate
-        return 0
-    fi
-    log_message "INFO" "Conda packages installed successfully"
-    echo "Paquetes de Conda instalados exitosamente."
-    conda deactivate
-}
-
-# Function to set up Python and Conda environments
-setup_python_conda_environments() {
-    log_message "INFO" "Setting up Python and Conda environments..."
-    echo "Configurando entornos de Python y Conda..."
-    setup_python_venv
-    setup_conda_env
-    log_message "INFO" "All Python dependencies installed successfully."
-    echo "Todas las dependencias de Python instaladas exitosamente."
+    echo "'psutil' successfully installed in Python virtual environment."
 }
 
 # Function to create plugins directory and README
 create_plugins_directory_and_readme() {
-    local plugins_dir="$MYBASH_DIR/plugins"
+    local plugins_dir="$MYBASH_DATA_PLUGINS"  # Usar MYBASH_DATA_PLUGINS
     if [[ ! -d "$plugins_dir" ]]; then
         sudo mkdir -p "$plugins_dir"
         log_message "INFO" "Created plugins directory: $plugins_dir"
-        echo "Directorio de plugins creado: $plugins_dir"
+        echo "Created plugins directory: $plugins_dir"
     else
         log_message "INFO" "Plugins directory already exists: $plugins_dir"
-        echo "El directorio de plugins ya existe: $plugins_dir"
+        echo "Plugins directory already exists: $plugins_dir"
     fi
+
+    # Create plugins.conf in $MYBASH_DIR/config/
+    local config_dir="$MYBASH_DIR/config"
+    local plugins_conf="$config_dir/plugins.conf"
+    if [[ ! -d "$config_dir" ]]; then
+        sudo mkdir -p "$config_dir"
+        log_message "INFO" "Created config directory: $config_dir"
+        echo "Created config directory: $config_dir"
+    fi
+    if [[ ! -f "$plugins_conf" ]]; then
+        log_message "INFO" "Creating $plugins_conf..."
+        echo "Creating $plugins_conf..."
+        echo "# Plugins configuration" | sudo tee "$plugins_conf" >/dev/null
+        echo "videos=true" | sudo tee -a "$plugins_conf" >/dev/null
+    else
+        log_message "INFO" "plugins.conf already exists: $plugins_conf"
+        echo "plugins.conf already exists: $plugins_conf"
+    fi
+
+    # Create README.md
     local readme_file="$plugins_dir/README.md"
     if [[ ! -f "$readme_file" ]]; then
-        log_message "INFO" "Creating $readme_file (to be populated separately)..."
-        echo "Creando $readme_file (se completará por separado)..."
-        sudo touch "$readme_file"
+        log_message "INFO" "Creating $readme_file..."
+        echo "Creating $readme_file..."
         echo "# Plugins in MyBash" | sudo tee "$readme_file" >/dev/null
-        echo "README content will be generated separately." | sudo tee -a "$readme_file" >/dev/null
+        echo "Available plugins: videos" | sudo tee -a "$readme_file" >/dev/null
     else
         log_message "INFO" "README.md already exists in plugins directory: $readme_file"
-        echo "README.md ya existe en el directorio de plugins: $readme_file"
+        echo "README.md already exists in plugins directory: $readme_file"
     fi
+
+    sudo chown -R "$SUDO_USER":staff "$plugins_dir" "$config_dir"
+    sudo chmod -R 755 "$plugins_dir" "$config_dir"
 }
 
 # Function to create backup
 create_backup() {
     local backup_file="$MYBASH_BACKUP_DIR/mybash_backup_$(date +%Y%m%d_%H%M%S).tar.gz"
     log_message "INFO" "Creating backup at $backup_file..."
-    echo "Creando respaldo en $backup_file..."
+    echo "Creating backup at $backup_file..."
     sudo tar -czf "$backup_file" "$MYBASH_DIR" 2>>"$LOG_FILE" || {
         log_message "WARNING" "Failed to create backup. Check $LOG_FILE."
-        echo "Advertencia: Falló la creación del respaldo. Revisa $LOG_FILE."
+        echo "Warning: Failed to create backup. Check $LOG_FILE."
     }
     log_message "INFO" "Backup created successfully."
-    echo "Respaldo creado exitosamente."
+    echo "Backup created successfully."
 }
 
 # Function to save MYBASH_DIR and MYBASH_DATA_HOME_DIR in path.conf
@@ -584,14 +615,14 @@ create_opt_directory_write_path() {
     if [[ ! -d "$OPT_DIR" ]]; then
         sudo mkdir -p "$OPT_DIR" || {
             log_message "ERROR" "Failed to create $OPT_DIR"
-            echo "Error: No se pudo crear $OPT_DIR"
+            echo "Error: Failed to create $OPT_DIR"
             exit 1
         }
         log_message "INFO" "Created directory: $OPT_DIR"
-        echo "Directorio creado: $OPT_DIR"
+        echo "Created directory: $OPT_DIR"
     else
         log_message "INFO" "Directory already exists: $OPT_DIR"
-        echo "El directorio ya existe: $OPT_DIR"
+        echo "Directory already exists: $OPT_DIR"
     fi
     if [[ -f "$PATH_CONF" ]]; then
         CURRENT_DIR=$(grep '^MYBASH_DIR=' "$PATH_CONF" | cut -d'=' -f2)
@@ -600,16 +631,16 @@ create_opt_directory_write_path() {
             echo "MYBASH_DIR=$MYBASH_DIR" | sudo tee "$PATH_CONF" >/dev/null
             echo "MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR" | sudo tee -a "$PATH_CONF" >/dev/null
             log_message "INFO" "Updated path.conf at $PATH_CONF with MYBASH_DIR=$MYBASH_DIR and MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR"
-            echo "Actualizado path.conf en $PATH_CONF con MYBASH_DIR=$MYBASH_DIR y MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR"
+            echo "Updated path.conf at $PATH_CONF with MYBASH_DIR=$MYBASH_DIR and MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR"
         else
             log_message "INFO" "path.conf already exists at $PATH_CONF with correct values"
-            echo "path.conf ya existe en $PATH_CONF con valores correctos"
+            echo "path.conf already exists at $PATH_CONF with correct values"
         fi
     else
         echo "MYBASH_DIR=$MYBASH_DIR" | sudo tee "$PATH_CONF" >/dev/null
         echo "MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR" | sudo tee -a "$PATH_CONF" >/dev/null
         log_message "INFO" "Created path.conf at $PATH_CONF with MYBASH_DIR=$MYBASH_DIR and MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR"
-        echo "Creado path.conf en $PATH_CONF con MYBASH_DIR=$MYBASH_DIR y MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR"
+        echo "Created path.conf at $PATH_CONF with MYBASH_DIR=$MYBASH_DIR and MYBASH_DATA_HOME_DIR=$MYBASH_DATA_HOME_DIR"
     fi
 }
 
@@ -618,7 +649,7 @@ copy_to_home_mybash() {
     HOME_MYBASH_DIR="$MYBASH_DATA_HOME_DIR"
     sudo mkdir -p "$HOME_MYBASH_DIR"
     log_message "INFO" "Copying files to $HOME_MYBASH_DIR..."
-    echo "Copiando archivos a $HOME_MYBASH_DIR..."
+    echo "Copying files to $HOME_MYBASH_DIR..."
     DIRECTORIES=("core" "db" "plugins" "tools" "utils")
     FILES=("main.zsh" "version")
     for dir in "${DIRECTORIES[@]}"; do
@@ -630,7 +661,140 @@ copy_to_home_mybash() {
         log_message "INFO" "Copied file '$file' to $HOME_MYBASH_DIR."
     done
     log_message "INFO" "Files copied successfully to $HOME_MYBASH_DIR."
-    echo "Archivos copiados exitosamente a $HOME_MYBASH_DIR."
+    echo "Files copied successfully to $HOME_MYBASH_DIR."
+}
+
+# Function to setup core tools configurations
+setup_core_tools_configs() {
+    local android_conf="$MYBASH_DIR/plugins/android/android.conf"
+    local videos_conf="$MYBASH_DIR/plugins/videos/videos.conf"
+
+    sudo -u "$SUDO_USER" mkdir -p "$MYBASH_DIR/plugins/android"
+    sudo -u "$SUDO_USER" mkdir -p "$MYBASH_DIR/plugins/videos"
+
+    if [[ ! -f "$android_conf" ]]; then
+        echo "# Android plugin configuration" | sudo -u "$SUDO_USER" tee "$android_conf" >/dev/null
+        echo "placeholder=" | sudo -u "$SUDO_USER" tee -a "$android_conf" >/dev/null
+        log_message "INFO" "Created Android config placeholder at $android_conf"
+        echo "Created Android configuration placeholder at $android_conf"
+    fi
+
+    if [[ ! -f "$videos_conf" ]]; then
+        echo "# Videos plugin configuration" | sudo -u "$SUDO_USER" tee "$videos_conf" >/dev/null
+        echo "placeholder=" | sudo -u "$SUDO_USER" tee -a "$videos_conf" >/dev/null
+        log_message "INFO" "Created Videos config placeholder at $videos_conf"
+        echo "Created Videos configuration placeholder at $videos_conf"
+    fi
+}
+
+# Function to setup tmuxinator config
+setup_tmuxinator() {
+    local tmuxinator_dir="/Users/$SUDO_USER/.config/tmuxinator"
+    local tmuxinator_config="$tmuxinator_dir/mybash.yml"
+    if [[ ! -f "$tmuxinator_config" ]]; then
+        sudo -u "$SUDO_USER" mkdir -p "$tmuxinator_dir"
+        echo "# Project name in tmuxinator" | sudo -u "$SUDO_USER" tee "$tmuxinator_config" >/dev/null
+        echo "name: mybash" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "root: $MYBASH_DIR" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "# tmux session where MyBash and its plugins will run" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "windows:" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "  - mybash:" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "      layout: main-horizontal" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "      panes:" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "        - zsh -c 'myb'  # Panel 1: Command line" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "        - zsh -c 'myb videos'  # Panel 2: Videos" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "        - zsh -c 'myb android'  # Panel 3: Android" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        echo "        - zsh -c 'tail -f \$MYBASH_LOGS_DIR/mybash.log'  # Panel 4: Real-time log" | sudo -u "$SUDO_USER" tee -a "$tmuxinator_config" >/dev/null
+        log_message "INFO" "Created tmuxinator config at $tmuxinator_config"
+        echo "tmuxinator config created at $tmuxinator_config"
+    else
+        log_message "INFO" "tmuxinator config already exists at $tmuxinator_config"
+        echo "tmuxinator config already exists at $tmuxinator_config"
+    fi
+    sudo chown -R "$SUDO_USER":staff "$tmuxinator_dir"
+}
+
+# Function to setup cyberpunk aesthetics
+setup_cyberpunk() {
+    local tmux_conf="/Users/$SUDO_USER/.tmux.conf"
+    if [[ ! -f "$tmux_conf" ]] || ! grep -q "set -g mouse on" "$tmux_conf"; then
+        echo "# Enable mouse support" | sudo -u "$SUDO_USER" tee "$tmux_conf" >/dev/null
+        echo "set -g mouse on" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "# Cyberpunk aesthetics" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g status-bg \"#000000\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g status-fg \"#00ff00\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g pane-border-style \"fg=#0066ff\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g pane-active-border-style \"fg=#33ff99\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g status-left \"#[fg=#00aaff,bg=#000000] MyBash \"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g status-right \"#[fg=#cccccc,bg=#000000] %Y-%m-%d %H:%M \"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g window-status-current-style \"fg=#33ff99,bg=#000000\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g window-status-style \"fg=#0066ff,bg=#000000\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        log_message "INFO" "Configured cyberpunk aesthetics in $tmux_conf"
+        echo "Cyberpunk aesthetics configured in $tmux_conf"
+    fi
+
+    local zshrc="/Users/$SUDO_USER/.zshrc"
+    if ! grep -q "Cyberpunk prompt" "$zshrc"; then
+        echo "" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "# Cyberpunk prompt with animation" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "autoload -U colors && colors" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "PROMPT='%{\$fg[#00ff00]%}➜ %{\$fg[#0066ff]%}%n@%m %{\$fg[#33ff99]%}%~ %{\$reset_color%}'" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "# ASCII logo in neon green on startup" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "echo -e \"\e[32m\"" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "cat << 'ASCII'" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "  m y b a s h" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "  -----------" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "  |  MyBash |" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "  -----------" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "ASCII" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "echo -e \"\e[0m\"" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "# Glitch effect for invalid commands" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "command_not_found_handler() {" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "    echo -e \"\e[31m>>> ERROR: Command '\$1' not found - SYSTEM GLITCH DETECTED <<<\e[0m\"" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "    return 127" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "}" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "# Source MyBash main script" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "source $MYBASH_DIR/main.zsh" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "# Cyberpunk fzf colors" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "export FZF_DEFAULT_OPTS='" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "  --color=bg:#000000,bg+:#000000,fg:#cccccc,fg+:#33ff99" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "  --color=hl:#00aaff,hl+:#00ff00,info:#0066ff,marker:#ff5555" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "  --color=prompt:#00aaff,pointer:#33ff99,spinner:#0066ff,header:#cccccc" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        echo "'" | sudo -u "$SUDO_USER" tee -a "$zshrc" >/dev/null
+        log_message "INFO" "Configured cyberpunk aesthetics in $zshrc"
+        echo "Cyberpunk aesthetics configured in $zshrc"
+    fi
+}
+
+# Function to setup tmux mouse support
+setup_tmux_mouse() {
+    local tmux_conf="/Users/$SUDO_USER/.tmux.conf"
+    if ! grep -q "set -g mouse on" "$tmux_conf"; then
+        echo "" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "# Mouse support for tmux" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "set -g mouse on" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        echo "" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        if command -v pbcopy >/dev/null; then
+            echo "bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel \"pbcopy\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        elif command -v xclip >/dev/null; then
+            echo "bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel \"xclip -selection clipboard\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        elif command -v clip.exe >/dev/null; then
+            echo "bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel \"clip.exe\"" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        else
+            echo "bind -T copy-mode MouseDragEnd1Pane send-keys -X copy-selection-and-cancel" | sudo -u "$SUDO_USER" tee -a "$tmux_conf" >/dev/null
+        fi
+        log_message "INFO" "Configured tmux mouse support in $tmux_conf"
+        echo "tmux mouse support configured in $tmux_conf"
+    else
+        log_message "INFO" "tmux mouse support already configured in $tmux_conf"
+        echo "tmux mouse support already configured in $tmux_conf"
+    fi
 }
 
 # Base install sequence
@@ -650,7 +814,7 @@ base_install_sequence() {
     echo "Step 7: Creating symbolic links..."
     create_symlinks
     echo "Step 8: Setting up virtual environments..."
-    setup_python_conda_environments
+    setup_python_venv
     echo "Step 9: Creating plugins directory..."
     create_plugins_directory_and_readme
     echo "Step 10: Creating backup..."
@@ -659,27 +823,35 @@ base_install_sequence() {
     load_dependencies "$(uname -s)"
     echo "Step 12: Saving mybash directory..."
     create_opt_directory_write_path
+    echo "Step 13: Setting up core tools configurations..."
+    setup_core_tools_configs
+    echo "Step 14: Setting up tmuxinator..."
+    #setup_tmuxinator
+    echo "Step 15: Setting up cyberpunk aesthetics..."
+    setup_cyberpunk
+    echo "Step 16: Setting up tmux mouse support..."
+    setup_tmux_mouse
 }
 
 # Main install logic
 case "$MODE" in
     prod)
-        echo "Ejecutando en modo producción..."
+        echo "Running in production mode..."
         log_message "INFO" "Running in production mode."
         MYBASH_DIR="/opt/mybash"
         sudo mkdir -p "$MYBASH_DIR"
         base_install_sequence
         copy_to_home_mybash
         log_message "INFO" "Production installation complete."
-        echo "Instalación en modo producción completada. Corre 'source ~/.zshrc' para usar mybash."
+        echo "Production installation completed. Run 'source ~/.zshrc' to use mybash."
         ;;
     dev)
-        echo "Ejecutando en modo desarrollo..."
+        echo "Running in development mode..."
         log_message "INFO" "Running in development mode."
         base_install_sequence
         log_message "INFO" "Development installation complete."
-        echo "Instalación en modo desarrollo completada. Corre 'source ~/.zshrc' para usar mybash."
+        echo "Development installation completed. Run 'source ~/.zshrc' to use mybash."
         ;;
 esac
 
-echo "Revisa el archivo de log en $LOG_FILE para más detalles."
+echo "Check the log file at $LOG_FILE for more details."

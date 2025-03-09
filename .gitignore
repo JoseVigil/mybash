@@ -26,3 +26,5 @@ Thumbs.db
 
 # Plugin Configuration File
 config/plugins.conf
+
+# Core tools configurations with credentialstools/drivers/*/*.conf
